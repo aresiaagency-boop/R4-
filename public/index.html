@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es" data-ui="holo">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Plataforma R4 · Rehabilitación de Estructuras</title>
+<meta name="description" content="Plataforma de gestión de R4 Rehabilitación de Estructuras con los agentes ATLAS y ECO.">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#020b18">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%232A2A29'/%3E%3Ctext x='32' y='44' font-family='Arial,sans-serif' font-size='30' font-weight='700' text-anchor='middle' fill='%2300FF7F'%3ER4%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="holo.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Secciones de la plataforma">
+    <div class="brand">
+      <img src="assets/r4-logo.svg" alt="R4 Rehabilitación de Estructuras" width="176" height="37">
+      <div class="plat"><span class="dot" id="plat-dot" aria-hidden="true"></span><span>Plataforma <b>R4</b> · <span id="plat-state">modo demostración</span></span></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <span>Sesión: <b id="who">Invitado</b></span>
+      <span>Mallorca · Islas Baleares</span>
+      <span class="small">v1.2 · Holocontrol · A.R.E.S. I.A.</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumb"><span class="code" id="crumb-code">00</span><h1 id="crumb-name">Mission Control</h1><button class="info-dot" id="info-btn" type="button" aria-label="Qué es esta sección" aria-expanded="false">i</button><span class="sub" id="crumb-sub"></span></div>
+      <div class="right">
+        <span class="pill sample" id="src-pill" title="Origen de los datos de esta vista">Datos de ejemplo</span>
+        <span class="pill acc" id="vf-badge">Con VERI*FACTU</span>
+        <span class="pill"><span class="mono" id="today"></span></span>
+        <button class="btn back-btn" type="button" id="back-btn" aria-label="Volver a la vista anterior">‹ Atrás</button>
+        <button class="btn primary" type="button" id="auth-btn">Conectar datos reales</button>
+        <button class="btn" type="button" id="exit-btn" aria-label="Salir al portal de acceso">Salir</button>
+      </div>
+    </header>
+    <main class="view" id="view" tabindex="-1"></main>
+    <p class="foot" id="foot"></p>
+  </div>
+</div>
+
+<dialog class="login" id="login" aria-labelledby="login-title">
+  <form method="dialog" id="login-form">
+    <h2 id="login-title">Acceso de Dirección</h2>
+    <p class="note">Introduce la contraseña de la plataforma para ver los datos reales que llegan por Gmail (ECO) y WhatsApp (ATLAS).</p>
+    <label for="login-pass" class="small muted">Contraseña</label>
+    <input type="password" id="login-pass" autocomplete="current-password" required minlength="8">
+    <p class="login-err" id="login-err" role="alert" hidden></p>
+    <div class="login-actions">
+      <button class="btn" type="button" id="login-cancel">Cancelar</button>
+      <button class="btn primary" type="submit" id="login-submit">Entrar</button>
+    </div>
+  </form>
+</dialog>
+<div class="portal" id="portal" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "r4-plataforma",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plataforma R4 Rehabilitación de Estructuras · ATLAS + ECO (n8n, Postgres, Evolution API) · A.R.E.S. I.A.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build:n8n": "node scripts/build-n8n.mjs",
+    "dev": "node scripts/dev-server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "eval": "node scripts/run-evals.mjs",
+    "verify": "node scripts/verify.mjs"
+  }
+}

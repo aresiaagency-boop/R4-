@@ -1,0 +1,319 @@
+{
+  "name": "R4 · API de la plataforma (Vercel → Postgres)",
+  "nodes": [
+    {
+      "id": "462d438c-6690-4337-a728-2bdfe84c9752",
+      "name": "POST /webhook/r4-api",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "r4-api",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "763d964d-6cc0-41ca-a460-cc458f3fce51",
+      "notes": "Credencial Header Auth «R4 API key»: Name = x-r4-key · Value = el mismo valor que R4_API_KEY en Vercel"
+    },
+    {
+      "id": "0c044920-898d-4bbb-a7fc-05b666a20187",
+      "name": "r4_api",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT r4_api($1::jsonb) AS r",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json.body || {}) }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Zcr7iqVn6j1Z7UAb",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "5a4721ee-9f99-4cd7-a62f-9a7e64830dce",
+      "name": "¿Enviar WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a818d845-bab2-4c17-aeee-238703ac4b1d",
+              "leftValue": "={{ $json.r.enviar_wa === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "503c5a7b-3fc3-4790-a1cc-afbb4ec7d30a",
+      "name": "Componer WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "// Construye un aviso por cada número de destino configurado en r4_config.wa_destino_direccion\nconst etiquetas = { nombre: 'Nombre', empresa: 'Empresa', email: 'Email', telefono: 'Teléfono', servicio: 'Servicio', urgencia: 'Urgencia', solicita: 'Solicita', tipo_cliente: 'Tipo', direccion_obra: 'Dirección de la obra', municipio: 'Municipio', titulo: 'Asunto', resumen: 'Resumen' };\nconst out = [];\nfor (const it of $input.all()) {\n  const r = it.json.r || {};\n  const x = r.extraccion || {};\n  const wa = r.wa || {};\n  const campos = String(wa.campos || 'nombre,empresa,email,telefono,servicio,urgencia,resumen').split(',').map(s => s.trim()).filter(Boolean);\n  const lineas = ['*NUEVO ' + (r.canal === 'whatsapp' ? 'WHATSAPP' : 'CORREO') + ' DE CLIENTE · R4*' + (x.urgencia === 'alta' ? ' 🔴 URGENTE' : '')];\n  for (const c of campos) {\n    const v = x[c];\n    if (v !== undefined && v !== null && String(v).trim() !== '') lineas.push('*' + (etiquetas[c] || c) + ':* ' + String(v).trim());\n  }\n  if (wa.ficha) lineas.push('*Ficha:* ' + wa.ficha);\n  lineas.push('_Mensaje #' + r.id + ' · oportunidad #' + r.oportunidad_id + '_');\n  const destinos = String(wa.destino || '').split(',').map(s => s.replace(/[^0-9]/g, '')).filter(Boolean);\n  for (const number of destinos) {\n    out.push({ json: { id: r.id, url: String(wa.url || '').replace(/\\/+$/, ''), instancia: wa.instancia, number, text: lineas.join('\\n') } });\n  }\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "9d24fdd0-ea6a-4f93-ab99-40ef54131a77",
+      "name": "Evolution · enviar aviso",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}/message/sendText/{{ encodeURIComponent($json.instancia) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $json.number, text: $json.text }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "notes": "Credencial Header Auth «Evolution API R4»: Name = apikey · Value = apikey de la instancia"
+    },
+    {
+      "id": "b6fc2a3e-4d83-42ee-ac4c-260029876f8c",
+      "name": "Marcar WA enviado",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1160,
+        -180
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT r4_marcar_wa($1::jsonb) AS r",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify({ id: $('Componer WhatsApp').item.json.id, ok: true }) }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Zcr7iqVn6j1Z7UAb",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "7f7313af-47d3-46ca-aa66-94a7dc5733de",
+      "name": "Marcar WA fallido",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1160,
+        -20
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT r4_marcar_wa($1::jsonb) AS r",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify({ id: $('Componer WhatsApp').item.json.id, ok: false, detalle: ($json.error && ($json.error.message || $json.error.description)) || JSON.stringify($json).slice(0, 300) }) }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "Zcr7iqVn6j1Z7UAb",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "016b6967-e451-4c8b-a608-fb64a6dcb7c0",
+      "name": "Responder (WA enviado)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1380,
+        -180
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify(Object.assign({}, $('r4_api').first().json.r, { wa_enviado: true })) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "46ac14c8-c517-4aec-a92e-2b5b497641bf",
+      "name": "Responder (WA fallido)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1380,
+        -20
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify(Object.assign({}, $('r4_api').first().json.r, { wa_enviado: false, wa_error: $json.r && $json.r.ok ? 'envío fallido' : 'error' })) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "3a907fd9-26ec-4e44-a598-2d539fe5cdaf",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        120
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.r) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "POST /webhook/r4-api": {
+      "main": [
+        [
+          {
+            "node": "r4_api",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "r4_api": {
+      "main": [
+        [
+          {
+            "node": "¿Enviar WhatsApp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Enviar WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Componer WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componer WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Evolution · enviar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution · enviar aviso": {
+      "main": [
+        [
+          {
+            "node": "Marcar WA enviado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar WA fallido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar WA enviado": {
+      "main": [
+        [
+          {
+            "node": "Responder (WA enviado)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar WA fallido": {
+      "main": [
+        [
+          {
+            "node": "Responder (WA fallido)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Madrid"
+  },
+  "pinData": {}
+}
