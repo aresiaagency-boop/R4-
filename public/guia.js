@@ -13,7 +13,7 @@ let S = { on: false, i: 0, done: {}, calc: {} };
 try { S = Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) {}
 S.calc = Object.assign({}, CALC0, S.calc || {});
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
-let SUM = null, LIVE = false;
+let SUM = null, SES = null, LIVE = false;
 
 const N8N = 'https://r4-n8n.7dklrk.easypanel.host';
 const LINKS = {
@@ -32,10 +32,18 @@ const FASES = [
   { id: 'f4', n: '4 · Piloto automático', dias: () => 5 }
 ];
 const STEPS = [
-  { id: 'f0-acceso', f: 'f0', t: 'Entrar como Dirección', rol: 'Dirección', min: 2, sec: 'mission-control', sel: '#exit-btn',
-    que: 'La plataforma está desplegada en Vercel y protegida con la contraseña de Dirección. Sin sesión todo se ve en modo demostración.',
-    pasos: ['Abre la plataforma y pulsa <b>Dirección → Entrar</b>.', 'Escribe la contraseña de <code>R4_PANEL_PASSWORD</code>.', 'Arriba debe aparecer la pastilla verde <b>En vivo</b>.'],
-    auto: s => !!s },
+  { id: 'f0-google', f: 'f0', t: 'Activar el login con Google', rol: 'A.R.E.S. I.A.', min: 10, sec: 'equipo', sel: '#auth-btn, #exit-btn', link: ['Variables de Vercel', LINKS.vercel],
+    que: 'Cada persona entra con su cuenta de Google: sin contraseñas compartidas. Dirección decide quién entra y con qué rol.',
+    pasos: ['Google Cloud (r4-estructuras) → <b>Clientes</b> → cliente web «R4 · Plataforma (login)» con URI de redirección <code>https://r4-eight-rosy.vercel.app/api/auth/callback</code>.', 'En Vercel: <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code> y <code>R4_DIRECCION_EMAILS</code> (cuentas de Dirección, separadas por coma) → Redeploy.', 'Mientras la app de Google esté en «Prueba», solo entran los usuarios de prueba: publícala para el equipo.', 'Se marca solo cuando el portal muestra «Entrar con Google».'],
+    datos: 'Cuentas de Google de Dirección.', auto: (s, ses) => !!(ses && ses.google) },
+  { id: 'f0-acceso', f: 'f0', t: 'Entrar como Dirección con Google', rol: 'Dirección', min: 2, sec: 'mission-control', sel: '#exit-btn',
+    que: 'Las cuentas de <code>R4_DIRECCION_EMAILS</code> entran siempre como Dirección: control total de datos, ajustes y accesos.',
+    pasos: ['Pulsa <b>Salir</b> → portal → <b>01 · Dirección → Entrar con Google</b>.', 'Elige la cuenta de Dirección.', 'Abajo a la izquierda debe verse tu nombre · Dirección, y arriba la pastilla verde <b>En vivo</b>.', 'La contraseña queda solo como acceso de emergencia.'],
+    auto: (s, ses) => !!(s && s.yo && s.yo.rol === 'direccion' && s.yo.via === 'google') },
+  { id: 'f0-equipo', f: 'f0', t: 'Dar acceso al equipo (Dirección aprueba)', rol: 'Dirección', min: 5, sec: 'equipo', sel: '#eq-pend',
+    que: 'Cada persona del equipo entra con Google y queda pendiente; Dirección elige su rol y la aprueba. Retirar un acceso es inmediato.',
+    pasos: ['Pide a cada persona que abra la plataforma y pulse <b>02 · Equipo → Entrar con Google</b>.', 'En <b>12 · Equipo y accesos</b>: elige el rol (Técnico, Comercial, Administración, Colaborador) y pulsa <b>Aprobar</b>.', 'Comprueba la tabla de permisos por rol.', 'Se marca solo con al menos una persona además de Dirección con acceso.'],
+    datos: 'Lista del equipo con su cuenta de Google y su rol.', auto: s => (s.usuarios || []).filter(u => u.estado === 'activo' && u.rol !== 'direccion').length >= 1 },
   { id: 'f0-flujos', f: 'f0', t: 'Flujos publicados en n8n', rol: 'A.R.E.S. I.A.', min: 10, sec: 'mission-control', sel: '.mc-net', link: ['Abrir n8n', LINKS.n8n],
     que: 'Tres flujos hacen funcionar el sistema: «R4 · API» (plataforma ↔ base de datos), «R4 · ECO» (lee Gmail) y «ATLASR4» (WhatsApp).',
     pasos: ['En n8n, cada flujo debe mostrar <b>1/1 · Published</b>.', 'Credenciales asignadas: Postgres, OpenAI, Gmail, «R4 API key» y «Evolution API R4».', 'El mapa de conexiones de Mission Control debe mostrar n8n <b>En línea</b>.'],
@@ -102,7 +110,7 @@ const STEPS = [
 ];
 const minOf = st => typeof st.min === 'function' ? st.min(S.calc) : st.min;
 const datosOf = st => typeof st.datos === 'function' ? st.datos(S.calc) : st.datos;
-const autoOf = st => { if (!st.auto || !SUM) return null; try { return !!st.auto(SUM); } catch (e) { return null; } };
+const autoOf = st => { if (!st.auto) return null; if (!SUM && st.id !== 'f0-google') return null; try { return !!st.auto(SUM || {}, SES); } catch (e) { return null; } };
 const isDone = st => !!S.done[st.id] || autoOf(st) === true;
 const progreso = () => Math.round(STEPS.filter(isDone).length * 100 / STEPS.length);
 function ingestaMin(c){ return c.clientes * 2.5 + c.oportunidades * 0.5 + c.inmuebles * 2; }
@@ -115,9 +123,9 @@ const nf = (v, d = 0) => Number(v).toLocaleString('es-ES', { maximumFractionDigi
 async function cargarVivo(){
   try {
     const s = await fetch('/api/session', { cache: 'no-store' }).then(r => r.json());
-    LIVE = !!s.authenticated;
+    SES = s; LIVE = !!s.authenticated;
     if (LIVE){ const r = await fetch('/api/r4?op=summary', { cache: 'no-store' }); const j = await r.json(); SUM = r.ok ? (j.data || j) : null; } else SUM = null;
-  } catch (e) { LIVE = false; SUM = null; }
+  } catch (e) { LIVE = false; SUM = null; SES = null; }
   if (S.on) pintarDock(); if (planEl) pintarPlan();
 }
 
@@ -283,7 +291,7 @@ function onCalc(e){
 function enlaceNav(){
   const nav = document.getElementById('nav'); if (!nav || nav.querySelector('[data-guia]')) return;
   const a = document.createElement('a'); a.href = '#implantacion'; a.dataset.guia = '1';
-  a.innerHTML = '<span class="code">12</span><span class="name">Implantación</span><span class="sub">Guía paso a paso y cálculos</span>';
+  a.innerHTML = '<span class="code">13</span><span class="name">Implantación</span><span class="sub">Guía paso a paso y cálculos</span>';
   a.addEventListener('click', ev => { ev.preventDefault(); abrirPlan(); });
   nav.appendChild(a);
 }

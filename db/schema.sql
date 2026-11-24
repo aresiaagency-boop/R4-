@@ -374,8 +374,67 @@ CREATE OR REPLACE FUNCTION r4_summary() RETURNS jsonb LANGUAGE sql STABLE AS $fn
 $fn$;
 
 -- ---------------------------------------------------------------------
+-- 4b) Usuarios con cuenta de Google · Dirección aprueba y asigna rol
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS usuarios (
+  email          text PRIMARY KEY,
+  nombre         text,
+  foto           text,
+  rol            text NOT NULL DEFAULT 'pendiente'
+                 CHECK (rol IN ('direccion','tecnico','comercial','administracion','colaborador','pendiente')),
+  estado         text NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','activo','bloqueado')),
+  aprobado_por   text,
+  aprobado_at    timestamptz,
+  ultimo_acceso  timestamptz,
+  accesos        int NOT NULL DEFAULT 0,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now()
+);
+
+-- Llamada solo desde Vercel (callback de Google). p = {email, nombre, foto, direccion:boolean}
+CREATE OR REPLACE FUNCTION r4_auth_login(p jsonb) RETURNS jsonb LANGUAGE plpgsql AS $fn$
+DECLARE
+  v_email text    := lower(trim(coalesce(p->>'email', '')));
+  v_dir   boolean := coalesce((p->>'direccion')::boolean, false);
+  u       usuarios%ROWTYPE;
+BEGIN
+  IF v_email = '' OR position('@' IN v_email) = 0 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'email no válido');
+  END IF;
+  SELECT * INTO u FROM usuarios WHERE email = v_email;
+  IF NOT FOUND THEN
+    -- Tope anti-spam: cualquiera con cuenta de Google puede pedir acceso
+    IF NOT v_dir AND (SELECT count(*) FROM usuarios WHERE estado = 'pendiente') >= 50 THEN
+      RETURN jsonb_build_object('ok', true, 'email', v_email, 'nombre', NULL, 'rol', 'pendiente', 'estado', 'pendiente');
+    END IF;
+    INSERT INTO usuarios (email, nombre, foto, rol, estado, aprobado_por, aprobado_at)
+    VALUES (v_email, nullif(left(regexp_replace(coalesce(p->>'nombre',''), '[[:cntrl:]]', '', 'g'), 80),''), nullif(left(p->>'foto', 500),''),
+            CASE WHEN v_dir THEN 'direccion' ELSE 'pendiente' END,
+            CASE WHEN v_dir THEN 'activo' ELSE 'pendiente' END,
+            CASE WHEN v_dir THEN 'sistema' END, CASE WHEN v_dir THEN now() END)
+    RETURNING * INTO u;
+    INSERT INTO eventos (agente, nivel, texto, ref)
+    VALUES ('SISTEMA', CASE WHEN v_dir THEN 'info' ELSE 'warn' END,
+            CASE WHEN v_dir THEN 'Acceso de Dirección registrado: ' || v_email
+                 ELSE 'Solicitud de acceso con Google pendiente de aprobar: ' || coalesce(u.nombre, v_email) || ' (' || v_email || ')' END,
+            'usuario:' || v_email);
+  ELSIF v_dir AND (u.rol <> 'direccion' OR u.estado <> 'activo') THEN
+    UPDATE usuarios SET rol = 'direccion', estado = 'activo', updated_at = now() WHERE email = v_email RETURNING * INTO u;
+  END IF;
+  IF u.estado = 'activo' THEN
+    UPDATE usuarios SET ultimo_acceso = now(), accesos = accesos + 1,
+           nombre = coalesce(nullif(left(regexp_replace(coalesce(p->>'nombre',''), '[[:cntrl:]]', '', 'g'), 80),''), nombre),
+           foto = coalesce(nullif(left(p->>'foto', 500),''), foto), updated_at = now()
+     WHERE email = v_email RETURNING * INTO u;
+    INSERT INTO eventos (agente, texto, ref) VALUES ('SISTEMA', 'Inicio de sesión con Google: ' || coalesce(u.nombre, v_email) || ' · ' || u.rol, 'usuario:' || v_email);
+  END IF;
+  RETURN jsonb_build_object('ok', true, 'email', u.email, 'nombre', u.nombre, 'rol', u.rol, 'estado', u.estado);
+END
+$fn$;
+
+-- ---------------------------------------------------------------------
 -- 5) Puerta de la API (llamada por el flujo "R4 · API" desde la plataforma)
---    p = {op: summary | set_config | update_extraccion | set_etapa | update_inmueble | reenviar_wa | marcar_cliente | marcar_ignorado, ...}
+--    p = {op: summary | set_config | update_extraccion | set_etapa | update_inmueble | usuario_set | reenviar_wa | marcar_cliente | marcar_ignorado | auth_login, actor:{email, rol, via}, ...}
 --    Si la respuesta lleva enviar_wa=true, n8n envía el WhatsApp y llama a r4_marcar_wa.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION r4_api(p jsonb) RETURNS jsonb LANGUAGE plpgsql AS $fn$
@@ -387,9 +446,73 @@ DECLARE
   m      mensajes%ROWTYPE;
   res    jsonb;
   permitidas text[] := ARRAY['evolution_url','evolution_instancia','wa_destino_direccion','wa_campos','eco_activo','gmail_cuenta','plataforma_url'];
+  v_actor text := lower(coalesce(p->'actor'->>'email', ''));
+  v_via   text := coalesce(p->'actor'->>'via', '');
+  v_rol   text;
+  v_obj   text;
+  u       usuarios%ROWTYPE;
 BEGIN
+  -- Alta/entrada con Google: solo la llama Vercel desde el callback (no está en la lista blanca del navegador)
+  IF v_op = 'auth_login' THEN
+    RETURN r4_auth_login(p);
+  END IF;
+
+  -- Autorización: el rol se lee en cada petición, así un cambio o bloqueo de Dirección es inmediato
+  IF v_via = 'password' THEN
+    v_rol := 'direccion';                       -- acceso de emergencia con contraseña de Dirección
+  ELSIF v_actor = '' THEN
+    RETURN jsonb_build_object('ok', false, 'auth', false, 'error', 'petición sin usuario');
+  ELSE
+    SELECT rol INTO v_rol FROM usuarios WHERE email = v_actor AND estado = 'activo';
+    IF v_rol IS NULL THEN
+      RETURN jsonb_build_object('ok', false, 'auth', false, 'error', 'acceso pendiente o retirado por Dirección');
+    END IF;
+  END IF;
+  IF v_op IN ('set_config', 'usuario_set') AND v_rol <> 'direccion' THEN
+    RETURN jsonb_build_object('ok', false, 'forbidden', true, 'error', 'solo Dirección puede hacer este cambio');
+  END IF;
+  IF v_op IN ('update_extraccion','set_etapa','update_inmueble','reenviar_wa','marcar_cliente','marcar_ignorado')
+     AND v_rol NOT IN ('direccion','tecnico','comercial') THEN
+    RETURN jsonb_build_object('ok', false, 'forbidden', true, 'error', 'tu rol es de solo lectura');
+  END IF;
+
   IF v_op = 'summary' THEN
-    RETURN jsonb_build_object('ok', true, 'data', r4_summary());
+    res := r4_summary();
+    IF v_rol <> 'direccion' THEN
+      -- Solo Dirección ve solicitudes de acceso y los datos completos de integración
+      res := res || jsonb_build_object(
+        'eventos', coalesce((SELECT jsonb_agg(e) FROM jsonb_array_elements(res->'eventos') e WHERE coalesce(e->>'ref','') NOT LIKE 'usuario:%'), '[]'::jsonb),
+        'config', (res->'config') || jsonb_build_object(
+          'evolution_url', CASE WHEN coalesce(res->'config'->>'evolution_url','') <> '' THEN 'configurada' ELSE '' END,
+          'wa_destino_direccion', CASE WHEN coalesce(res->'config'->>'wa_destino_direccion','') <> '' THEN '•••' || right(res->'config'->>'wa_destino_direccion', 3) ELSE '' END));
+    END IF;
+    RETURN jsonb_build_object('ok', true, 'data', res || jsonb_build_object(
+      'yo', jsonb_build_object('email', v_actor, 'rol', v_rol, 'via', v_via),
+      'usuarios', CASE WHEN v_rol = 'direccion' THEN (
+        SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY (t.estado = 'pendiente') DESC, t.created_at DESC), '[]'::jsonb) FROM (
+          SELECT email, nombre, foto, rol, estado, aprobado_por, aprobado_at, ultimo_acceso, accesos, created_at FROM usuarios) t)
+      ELSE NULL END));
+
+  ELSIF v_op = 'usuario_set' THEN
+    v_obj := lower(coalesce(p->>'email', ''));
+    IF v_obj = v_actor THEN RETURN jsonb_build_object('ok', false, 'error', 'no puedes cambiar tu propio acceso'); END IF;
+    SELECT * INTO u FROM usuarios WHERE email = v_obj;
+    IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'usuario no encontrado'); END IF;
+    UPDATE usuarios SET
+      rol    = CASE WHEN p->>'rol' IN ('direccion','tecnico','comercial','administracion','colaborador') THEN p->>'rol' ELSE rol END,
+      estado = CASE WHEN p->>'estado' IN ('activo','bloqueado') THEN p->>'estado' ELSE estado END,
+      aprobado_por = CASE WHEN p->>'estado' = 'activo' AND u.estado <> 'activo' THEN coalesce(nullif(v_actor,''), 'direccion') ELSE aprobado_por END,
+      aprobado_at  = CASE WHEN p->>'estado' = 'activo' AND u.estado <> 'activo' THEN now() ELSE aprobado_at END,
+      updated_at = now()
+    WHERE email = v_obj RETURNING * INTO u;
+    IF u.estado = 'activo' AND u.rol = 'pendiente' THEN
+      UPDATE usuarios SET rol = 'colaborador' WHERE email = v_obj RETURNING * INTO u;
+    END IF;
+    INSERT INTO eventos (agente, nivel, texto, ref)
+    VALUES ('DIRECCION', CASE WHEN u.estado = 'bloqueado' THEN 'warn' ELSE 'info' END,
+            'Acceso de ' || coalesce(u.nombre, u.email) || ': ' || u.estado || ' · rol ' || u.rol || ' (por ' || coalesce(nullif(v_actor,''), 'Dirección') || ').',
+            'usuario:' || v_obj);
+    RETURN jsonb_build_object('ok', true, 'email', u.email, 'rol', u.rol, 'estado', u.estado);
 
   ELSIF v_op = 'set_config' THEN
     FOR k, v IN SELECT * FROM jsonb_each_text(coalesce(p->'config', '{}'::jsonb)) LOOP
@@ -459,4 +582,4 @@ $fn$;
 INSERT INTO eventos (agente, texto) VALUES ('SISTEMA', 'Esquema R4 v1 instalado o actualizado.');
 
 SELECT jsonb_build_object('ok', true, 'tablas', (SELECT count(*) FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name IN ('r4_config','clientes','organizaciones','inmuebles','oportunidades','mensajes','eventos'))) AS r;
+        WHERE table_schema = 'public' AND table_name IN ('r4_config','clientes','organizaciones','inmuebles','oportunidades','mensajes','eventos','usuarios'))) AS r;

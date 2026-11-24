@@ -18,6 +18,26 @@ Navegador ──► Vercel (public/ + api/) ──► n8n «R4 · API» (/webhoo
 - Toda la lógica de datos vive en funciones SQL `r4_*` (`db/schema.sql`). n8n solo hace `SELECT r4_x($1::jsonb)`.
 - Vercel no guarda datos: valida sesión, filtra operaciones (lista blanca) y reenvía a n8n.
 
+## Acceso · login con Google y control de Dirección (v1.4)
+
+```
+Portal «Entrar con Google» ─► /api/auth/google (state anti-CSRF) ─► Google (openid email profile)
+  ─► /api/auth/callback: token + tokeninfo (aud, iss, email_verified) ─► n8n r4_api{op:auth_login} ─► tabla usuarios
+  ─► activo → cookie r4_session firmada {e,n,r,v,exp} · pendiente/bloqueado → /?acceso=pendiente|bloqueado
+```
+
+- `usuarios(email, rol, estado)`: roles `direccion · tecnico · comercial · administracion · colaborador`; estados `pendiente · activo · bloqueado`.
+- Cuentas de `R4_DIRECCION_EMAILS` entran SIEMPRE como Dirección (si alguien las bloquea, vuelven a activo al entrar). Resto: pendientes hasta que Dirección apruebe en **12 · Equipo y accesos**.
+- `api/r4.js` añade `actor {email, rol, via}` desde la sesión firmada (nunca del cuerpo). `r4_api` relee el rol en `usuarios` en CADA petición: bloquear o cambiar rol aplica al instante (401 `auth:false` → la plataforma borra la cookie y vuelve al portal).
+- Permisos en Postgres: `set_config` y `usuario_set` solo Dirección; ediciones de CRM/Bandeja solo Dirección/Técnico/Comercial; Administración y Colaborador = lectura. Nadie cambia su propio acceso.
+- `R4_PANEL_PASSWORD` (opcional) = acceso de emergencia de Dirección (`via: password`). Sin actor (`email` vacío y sin `via:password`) → `auth:false`: nada entra como Dirección por defecto.
+- OAuth con `state` + **PKCE S256** (cookie `r4_oauth_state` = `state.verifier`, Path=/api/auth, 10 min). La sesión se firma con el email que verificó Google y debe coincidir con el que devuelve la BD.
+- `GET /api/r4` solo hace `summary`; todo lo que escribe va por POST con comprobación de origen.
+- Roles no Dirección reciben `summary` filtrado: sin eventos `usuario:*` y con `evolution_url`/`wa_destino_direccion` enmascarados.
+- `R4_SESSION_SECRET` (recomendado, ≥ 32 aleatorios) firma las sesiones sin depender de `R4_API_KEY`.
+- Variables Vercel: `R4_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `R4_DIRECCION_EMAILS`, `R4_SESSION_SECRET`, opcionales `R4_PANEL_PASSWORD`, `R4_PUBLIC_URL` (fijarla en producción), `N8N_API_URL`.
+- Cliente OAuth GCP «R4 · Plataforma (login Google)» con redirect `https://r4-eight-rosy.vercel.app/api/auth/callback`. Si la app de Google está en «Prueba», solo entran los usuarios de prueba.
+
 ## Stack
 
 | Capa | Tecnología | Dónde |
@@ -35,7 +55,8 @@ Navegador ──► Vercel (public/ + api/) ──► n8n «R4 · API» (/webhoo
 
 - Lenguaje visual de **Ágora Hispana**: noche azul `#020b18`, cristal tallado con esquinas cortadas (`clip-path`), filo de **plasma vivo** (`conic-gradient` con `@property --ang` animado al tocar), cian `#4fd8ff` + verde R4 `#00ff7f`, rejilla de 44 px.
 - Orden **tipo Apple**: barra de secciones → lista → ficha (Contactos), segmentos (Contactos · Embudo · Inmuebles), acciones rápidas redondas, objetivos táctiles ≥ 48 px, tilde de pulsación.
-- Portal **«Elige tu acceso»** (01 Dirección · 02 Equipo y clientes), punto de información (i) por sección, **Atrás** y **Salir** en cada pantalla.
+- Portal **«Elige tu acceso»** (01 Dirección · 02 Equipo · 03 Clientes) con **Entrar con Google**, mensajes `?acceso=`, punto de información (i) por sección, **Atrás** y **Salir** en cada pantalla.
+- Acciones destructivas (rechazar, retirar acceso) con **confirmación de dos toques**, nunca `window.confirm` (bloquea la pantalla y la automatización).
 - `public/guia.js` + `guia.css` = Guía de implantación (independiente de app.js: DOM, `location.hash` y `/api/*`). Pasos en el array `STEPS` (con `auto(summary)` para comprobarse solos) y cálculos en `calculos()`. Estado en `localStorage['r4:guia']`.
 - `public/app.css` = estructura base; `public/holo.css` = piel Holocontrol (se carga después y no cambia el marcado). Respetar `prefers-reduced-motion`.
 
@@ -45,9 +66,11 @@ Navegador ──► Vercel (public/ + api/) ──► n8n «R4 · API» (/webhoo
 npm test                      # pruebas sin red: sesión, CSRF, lista blanca, coherencia de flujos, schema
 npm run build:n8n             # regenera n8n/R4_*.json desde db/schema.sql y n8n/eco-prompt.mjs
 npm run eval                  # OPENAI_API_KEY=… evalúa ECO con eval/eco-extraccion.jsonl (umbral 90 %)
-npm run dev                   # servidor local tipo Vercel (necesita R4_PANEL_PASSWORD, R4_API_KEY, N8N_API_URL)
+npm run dev                   # servidor local tipo Vercel (R4_API_KEY, N8N_API_URL y GOOGLE_* o R4_PANEL_PASSWORD; MOCK_GOOGLE=1 simula Google)
+PGDATABASE=r4test npm run eval:acceso   # matriz de permisos por rol (eval/acceso-roles.jsonl, 27 casos)
 node scripts/mock-n8n.mjs     # doble local de «R4 · API» contra Postgres local (PGDATABASE)
 npm run verify                # VERIFIER: Playwright, capturas en screenshots/ + verify-report.json
+# login Google simulado: dev-server con MOCK_GOOGLE=1 + R4_MOCK_GOOGLE=1 VERIFY_DIRECCION=<email de R4_DIRECCION_EMAILS> npm run verify
 psql -d r4test -f db/schema.sql && psql -d r4test -f db/test_flow.sql   # prueba E2E de las funciones SQL
 ```
 
@@ -65,6 +88,8 @@ psql -d r4test -f db/schema.sql && psql -d r4test -f db/test_flow.sql   # prueba
 
 - `.env*`, credenciales, apikeys de Evolution/OpenAI, contraseñas de Postgres → nunca en git ni en `r4_config`.
 - La apikey de Evolution vive SOLO en la credencial n8n «Evolution API R4». `R4_API_KEY` SOLO en Vercel y en la credencial n8n «R4 API key».
+- `GOOGLE_CLIENT_SECRET` SOLO en Vercel (lo escribe RHC). El `GOOGLE_CLIENT_ID` es público.
+- Nunca aceptar el actor (email/rol) desde el cuerpo de la petición: solo desde la cookie firmada.
 - No tocar el flujo original `ATLASR4` (id `Pu9Whh6Pm28EdzbB`) sin exportar antes una copia.
 - `db/seed_demo.sql` y `db/test_flow.sql` NUNCA contra la BD de producción.
 

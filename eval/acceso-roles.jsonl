@@ -1,0 +1,27 @@
+{"caso": "direccion·summary", "rol": "direccion", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
+{"caso": "direccion·set_config", "rol": "direccion", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "permitido"}
+{"caso": "direccion·usuario_set", "rol": "direccion", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "permitido"}
+{"caso": "direccion·set_etapa", "rol": "direccion", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "permitido"}
+{"caso": "direccion·reenviar_wa", "rol": "direccion", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "permitido"}
+{"caso": "tecnico·summary", "rol": "tecnico", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
+{"caso": "tecnico·set_config", "rol": "tecnico", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
+{"caso": "tecnico·usuario_set", "rol": "tecnico", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
+{"caso": "tecnico·set_etapa", "rol": "tecnico", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "permitido"}
+{"caso": "tecnico·reenviar_wa", "rol": "tecnico", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "permitido"}
+{"caso": "comercial·summary", "rol": "comercial", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
+{"caso": "comercial·set_config", "rol": "comercial", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
+{"caso": "comercial·usuario_set", "rol": "comercial", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
+{"caso": "comercial·set_etapa", "rol": "comercial", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "permitido"}
+{"caso": "comercial·reenviar_wa", "rol": "comercial", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "permitido"}
+{"caso": "administracion·summary", "rol": "administracion", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
+{"caso": "administracion·set_config", "rol": "administracion", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
+{"caso": "administracion·usuario_set", "rol": "administracion", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
+{"caso": "administracion·set_etapa", "rol": "administracion", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "prohibido"}
+{"caso": "administracion·reenviar_wa", "rol": "administracion", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "prohibido"}
+{"caso": "colaborador·summary", "rol": "colaborador", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
+{"caso": "colaborador·set_config", "rol": "colaborador", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
+{"caso": "colaborador·usuario_set", "rol": "colaborador", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
+{"caso": "colaborador·set_etapa", "rol": "colaborador", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "prohibido"}
+{"caso": "colaborador·reenviar_wa", "rol": "colaborador", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "prohibido"}
+{"caso": "pendiente·summary", "rol": "pendiente", "estado": "pendiente", "op": "summary", "extra": {}, "esperado": "sin_acceso"}
+{"caso": "bloqueado·summary", "rol": "tecnico", "estado": "bloqueado", "op": "summary", "extra": {}, "esperado": "sin_acceso"}

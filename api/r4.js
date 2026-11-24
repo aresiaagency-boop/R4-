@@ -1,10 +1,14 @@
 // Puerta de datos de la plataforma: valida sesión y operación, y reenvía a n8n («R4 · API»),
 // que ejecuta SELECT r4_api(...) en Postgres y, si toca, envía el WhatsApp por Evolution API.
 //   GET  /api/r4?op=summary
-//   POST /api/r4  { op, id?, etapa?, extraccion?, config? }
-import { env, isConfigured, isAuthed, sameOrigin, send, readBody } from '../lib/auth.js';
+//   POST /api/r4  { op, id?, etapa?, extraccion?, config?, email?, rol?, estado? }
+// Cada petición lleva el actor de la sesión ({email, rol, via}); Postgres decide permisos con el rol VIGENTE
+// en la tabla usuarios (si Dirección retira o cambia un acceso, aplica en la siguiente petición).
+import { env, isConfigured, isAuthed, sameOrigin, send, readBody, clearCookie } from '../lib/auth.js';
 
-const OPS = new Set(['summary', 'set_config', 'update_extraccion', 'set_etapa', 'update_inmueble', 'reenviar_wa', 'marcar_cliente', 'marcar_ignorado']);
+const OPS = new Set(['summary', 'set_config', 'update_extraccion', 'set_etapa', 'update_inmueble', 'reenviar_wa', 'marcar_cliente', 'marcar_ignorado', 'usuario_set']);
+export const ROLES = new Set(['direccion', 'tecnico', 'comercial', 'administracion', 'colaborador']);
+const ESTADOS = new Set(['activo', 'bloqueado']);
 const ETAPAS = new Set(['nuevo', 'contactado', 'visita', 'presupuesto', 'aceptado', 'perdido']);
 const CONFIG_KEYS = new Set(['evolution_url', 'evolution_instancia', 'wa_destino_direccion', 'wa_campos', 'eco_activo', 'gmail_cuenta', 'plataforma_url']);
 const EXTR_KEYS = new Set(['nombre', 'empresa', 'email', 'telefono', 'servicio', 'urgencia', 'solicita', 'tipo_cliente', 'direccion_obra', 'municipio', 'titulo', 'resumen']);
@@ -39,20 +43,32 @@ export function buildPayload(input) {
     if (p.config.evolution_url && !/^https?:\/\/\S+$/.test(p.config.evolution_url)) return { error: 'URL de Evolution no válida' };
     if (p.config.plataforma_url && !/^https:\/\/\S+$/.test(p.config.plataforma_url)) return { error: 'URL de la plataforma no válida' };
   }
+  if (op === 'usuario_set') {
+    const email = String(input.email || '').trim().toLowerCase();
+    if (!/^[^@\s]{1,64}@[^@\s]{1,190}$/.test(email)) return { error: 'email no válido' };
+    p.email = email;
+    if (input.rol !== undefined) { if (!ROLES.has(input.rol)) return { error: 'rol no válido' }; p.rol = input.rol; }
+    if (input.estado !== undefined) { if (!ESTADOS.has(input.estado)) return { error: 'estado no válido' }; p.estado = input.estado; }
+    if (!p.rol && !p.estado) return { error: 'nada que cambiar' };
+  }
   return { payload: p };
 }
 
+/** Actor que viaja a Postgres: identidad de la sesión firmada (nunca del cuerpo de la petición). */
+export const actorDe = (u) => ({ email: u.v === 'password' ? '' : String(u.e || ''), rol: u.r || '', via: u.v || 'google' });
+
 export default async function handler(req, res) {
   if (!isConfigured()) return send(res, 503, { error: 'acceso no configurado' });
-  if (!isAuthed(req)) return send(res, 401, { error: 'sesión no válida' });
+  const user = isAuthed(req);
+  if (!user) return send(res, 401, { error: 'sesión no válida' });
   if (req.method !== 'GET' && req.method !== 'POST') { res.setHeader('Allow', 'GET, POST'); return send(res, 405, { error: 'método no permitido' }); }
   if (req.method === 'POST' && !sameOrigin(req)) return send(res, 403, { error: 'origen no permitido' });
 
-  const input = req.method === 'GET'
-    ? { op: (req.query && req.query.op) || new URL(req.url, 'http://local').searchParams.get('op') || 'summary' }
-    : await readBody(req);
+  // GET solo lee (summary): con SameSite=Lax una navegación GET desde otra web lleva la cookie
+  const input = req.method === 'GET' ? { op: 'summary' } : await readBody(req);
   const { payload, error } = buildPayload(input);
   if (error) return send(res, 400, { error });
+  payload.actor = actorDe(user);
 
   const { n8nUrl, apiKey } = env();
   let r;
@@ -74,6 +90,7 @@ export default async function handler(req, res) {
       : 'respuesta no válida de n8n';
     return send(res, 502, { error: hint, status: r.status });
   }
-  if (data.ok === false) return send(res, 400, { error: data.error || 'error en la operación' });
+  if (data.auth === false) { res.setHeader('Set-Cookie', clearCookie()); return send(res, 401, { error: data.error || 'acceso retirado', auth: false }); }
+  if (data.ok === false) return send(res, data.forbidden ? 403 : 400, { error: data.error || 'error en la operación' });
   return send(res, 200, data);
 }

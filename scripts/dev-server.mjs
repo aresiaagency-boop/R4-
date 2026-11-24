@@ -9,7 +9,27 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 3000);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json' };
-const routes = { '/api/session': '../api/session.js', '/api/r4': '../api/r4.js' };
+const routes = { '/api/session': '../api/session.js', '/api/r4': '../api/r4.js', '/api/auth/google': '../api/auth/google.js', '/api/auth/callback': '../api/auth/callback.js' };
+
+// MOCK_GOOGLE=1 (solo local): simula los endpoints de token de Google. El navegador de pruebas intercepta
+// accounts.google.com y vuelve al callback con code=<email en base64url>.
+if (process.env.MOCK_GOOGLE === '1') {
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, o) => {
+    const u = String(url);
+    if (u.startsWith('https://oauth2.googleapis.com/tokeninfo')) {
+      const email = Buffer.from(new URL(u).searchParams.get('id_token'), 'base64url').toString();
+      const nombre = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      return new Response(JSON.stringify({ aud: process.env.GOOGLE_CLIENT_ID, iss: 'https://accounts.google.com', email, email_verified: 'true', name: nombre, exp: String(Math.floor(Date.now() / 1000) + 600) }));
+    }
+    if (u.startsWith('https://oauth2.googleapis.com/token')) {
+      const code = new URLSearchParams(o.body.toString()).get('code');
+      return new Response(JSON.stringify({ id_token: code }));
+    }
+    return real(url, o);
+  };
+  console.log('MOCK_GOOGLE activo (solo pruebas locales)');
+}
 
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);

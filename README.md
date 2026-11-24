@@ -26,10 +26,13 @@ Sin sesión, la plataforma funciona en **modo demostración** con datos de ejemp
 2. n8n → Credentials → *Header Auth* «**R4 API key**»: Name `x-r4-key`, Value = el secreto.
 3. Importar `n8n/R4_API.json`, asignar «R4 API key» al Webhook y «Evolution API R4» al nodo Evolution → **Publish**.
 4. Vercel → `r4` → Settings → Environment Variables (Production + Preview):
-   - `R4_PANEL_PASSWORD` = contraseña de Dirección (mín. 8)
    - `R4_API_KEY` = el mismo secreto del paso 1
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` = cliente OAuth web «R4 · Plataforma (login Google)» del proyecto GCP `r4-estructuras`, con URI de redirección `https://<dominio>/api/auth/callback`
+   - `R4_DIRECCION_EMAILS` = cuentas de Google de Dirección, separadas por coma (siempre entran como Dirección)
+   - (opcional) `R4_PANEL_PASSWORD` = acceso de emergencia de Dirección (mín. 8)
    - (opcional) `N8N_API_URL` = `https://r4-n8n.7dklrk.easypanel.host/webhook/r4-api`
-5. Redeploy. Entrar en la plataforma → **Conectar datos reales**.
+5. Redeploy. Entrar en la plataforma → **01 · Dirección → Entrar con Google**.
+6. Equipo: cada persona pulsa **02 · Equipo → Entrar con Google**; queda pendiente y Dirección la aprueba con su rol en **12 · Equipo y accesos**. «Retirar acceso» la saca en su siguiente acción.
 
 ### 3. Gmail (cuenta nueva de R4) → ECO
 1. GCP `r4-estructuras` → Google Auth Platform → **Clientes** → *Aplicación web*. URI de redirección: `https://r4-n8n.7dklrk.easypanel.host/rest/oauth2-credential/callback`.

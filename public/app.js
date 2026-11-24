@@ -29,7 +29,8 @@ const sections = [
   {id:'finanzas', code:'08', name:'Finanzas', sub:'Control mensual'},
   {id:'atlas', code:'09', name:'ATLAS', sub:'Orquestador inteligente'},
   {id:'configuracion', code:'10', name:'Configuración', sub:'Empresa, roles y Verifactu'},
-  {id:'hoja-de-ruta', code:'11', name:'Hoja de ruta', sub:'Fases y datos pendientes de R4'}
+  {id:'hoja-de-ruta', code:'11', name:'Hoja de ruta', sub:'Fases y datos pendientes de R4'},
+  {id:'equipo', code:'12', name:'Equipo y accesos', sub:'Google, roles y aprobaciones'}
 ];
 /* ---------- datos de ejemplo ---------- */
 const obras = [
@@ -449,8 +450,8 @@ views['configuracion'] = () => `
    Sesión: /api/session  ·  Datos y acciones: /api/r4  (Vercel → n8n «R4 · API» → Postgres)
    Sin sesión, las secciones vivas usan DEMO, con la misma forma que r4_summary().
    ===================================================================== */
-const LIVE_SECTIONS = new Set(['mission-control','crm','bandeja','atlas','configuracion']);
-const live = { configured:null, noBackend:false, authed:false, data:null, loading:false, error:null, at:null, msgId:null, editing:false, busy:false, editInm:null, crmTab:'contactos', cliId:null, q:'' };
+const LIVE_SECTIONS = new Set(['mission-control','crm','bandeja','atlas','configuracion','equipo']);
+const live = { configured:null, noBackend:false, authed:false, user:null, google:false, password:false, acceso:null, data:null, loading:false, error:null, at:null, msgId:null, editing:false, busy:false, editInm:null, crmTab:'contactos', cliId:null, q:'' };
 const ETAPAS = [['nuevo','Nuevo'],['contactado','Contactado'],['visita','Visita'],['presupuesto','Presupuesto'],['aceptado','Aceptado']];
 const ETAPA_LARGA = { nuevo:'Nuevo', contactado:'Contactado', visita:'Visita de diagnóstico', presupuesto:'Presupuesto enviado', aceptado:'Aceptado', perdido:'Perdido' };
 const CAMPOS = [['nombre','Nombre'],['empresa','Empresa'],['email','Email'],['telefono','Teléfono'],['servicio','Servicio'],['urgencia','Urgencia'],['solicita','Solicita'],['tipo_cliente','Tipo de cliente'],['direccion_obra','Dirección de la obra'],['municipio','Municipio'],['titulo','Asunto'],['resumen','Resumen']];
@@ -466,6 +467,21 @@ const fmtFecha = d => !d ? '—' : (dayKey(d) === dayKey(Date.now()) ? fmtHora(d
 const isLive = () => live.authed && !!live.data;
 const srcTag = on => on ? '<span class="src live">En vivo</span>' : '<span class="src demo">Demostración</span>';
 const iniciales = n => String(n || '?').replace(/^(CP|AF)\s+/i, '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+
+/* ---------- Roles: Dirección siempre lleva el control ---------- */
+const ROLES = {
+  direccion:['Dirección','Control total: datos, ajustes de ECO/WhatsApp y accesos del equipo'],
+  tecnico:['Técnico / jefe de obra','CRM, embudo, inmuebles y Bandeja: consulta y edita'],
+  comercial:['Comercial / atención','CRM y Bandeja: consulta y edita'],
+  administracion:['Administración','Consulta todo · solo lectura hasta la fase de facturación'],
+  colaborador:['Colaborador externo','Consulta · solo lectura'],
+  pendiente:['Pendiente','Sin acceso hasta que Dirección apruebe']
+};
+const rolNom = r => (ROLES[r] || [r || '—'])[0];
+const rolActual = () => !live.authed ? 'direccion' : ((live.data && live.data.yo && live.data.yo.rol) || (live.user && live.user.rol) || 'direccion');
+const esDireccion = () => rolActual() === 'direccion';
+const puedeEditar = () => ['direccion','tecnico','comercial'].includes(rolActual());
+const yoEmail = () => (live.data && live.data.yo && live.data.yo.email) || (live.user && live.user.via === 'google' ? live.user.email : '') || (isLive() ? '' : DEMO.yo.email);
 
 /* ---------- DEMO: misma forma que r4_summary() ---------- */
 const T0 = Date.now(), ago = m => new Date(T0 - m * 60000).toISOString();
@@ -510,7 +526,18 @@ const DEMO = {
     {agente:'ECO', nivel:'warn', texto:'No se pudo enviar el aviso por WhatsApp: HTTP 401 · apikey de Evolution no válida.', created_at:ago(55)},
     {agente:'ECO', nivel:'info', texto:'Correo ignorado (no es cliente): Novedades de producto · noviembre.', created_at:ago(70)},
     {agente:'DIRECCION', nivel:'info', texto:'Oportunidad #5 movida a «presupuesto».', created_at:ago(60 * 20)},
+    {agente:'SISTEMA', nivel:'warn', texto:'Solicitud de acceso con Google pendiente de aprobar: Marta Serra (marta.serra@gmail.example)', created_at:ago(8)},
     {agente:'SISTEMA', nivel:'info', texto:'Esquema R4 instalado o actualizado.', created_at:ago(60 * 30)}
+  ],
+  yo: { email:'direccion@r4.example', rol:'direccion', via:'google' },
+  usuarios: [
+    {email:'marta.serra@gmail.example', nombre:'Marta Serra', rol:'pendiente', estado:'pendiente', accesos:0, created_at:ago(8)},
+    {email:'pere.oliver@gmail.example', nombre:'Pere Oliver', rol:'pendiente', estado:'pendiente', accesos:0, created_at:ago(60 * 3)},
+    {email:'direccion@r4.example', nombre:'Dirección R4', rol:'direccion', estado:'activo', aprobado_por:'sistema', accesos:42, ultimo_acceso:ago(1), created_at:ago(60 * 24 * 9)},
+    {email:'jordi.tecnico@r4.example', nombre:'Jordi Bauzà', rol:'tecnico', estado:'activo', aprobado_por:'direccion@r4.example', accesos:17, ultimo_acceso:ago(95), created_at:ago(60 * 24 * 7)},
+    {email:'aina.comercial@r4.example', nombre:'Aina Colom', rol:'comercial', estado:'activo', aprobado_por:'direccion@r4.example', accesos:23, ultimo_acceso:ago(40), created_at:ago(60 * 24 * 7)},
+    {email:'gestoria@asesoria.example', nombre:'Asesoría Llevant', rol:'administracion', estado:'activo', aprobado_por:'direccion@r4.example', accesos:3, ultimo_acceso:ago(60 * 30), created_at:ago(60 * 24 * 5)},
+    {email:'antiguo.colaborador@gmail.example', nombre:'Toni Vich', rol:'colaborador', estado:'bloqueado', aprobado_por:'direccion@r4.example', accesos:6, ultimo_acceso:ago(60 * 24 * 20), created_at:ago(60 * 24 * 60)}
   ]
 };
 (() => { const byId = Object.fromEntries(DEMO.clientes.map(c => [c.id, c])); DEMO.oportunidades.forEach(o => { const c = byId[o.cliente_id] || {}; Object.assign(o, { cliente_nombre:c.nombre, cliente_empresa:c.empresa, cliente_email:c.email, cliente_tel:c.telefono, organizacion_tipo:c.organizacion_tipo }); }); })();
@@ -530,18 +557,23 @@ async function api(path, opts){
   return body;
 }
 async function checkSession(){
-  try { const s = await api('/api/session'); live.configured = !!s.configured; live.authed = !!s.authenticated; live.noBackend = false; }
-  catch(e){ live.authed = false; live.configured = null; live.noBackend = true; }
+  try { const s = await api('/api/session'); live.configured = !!s.configured; live.authed = !!s.authenticated; live.user = s.user || null; live.google = !!s.google; live.password = !!s.password; live.noBackend = false; }
+  catch(e){ live.authed = false; live.user = null; live.configured = null; live.noBackend = true; }
 }
 async function loadData(quiet){
   if (!live.authed) return;
   live.loading = true; if (!quiet) updateChrome();
   try { const r = await api('/api/r4?op=summary'); live.data = r.data || r; live.error = null; live.at = new Date(); }
-  catch(e){ live.error = e.message; if (e.status === 401){ live.authed = false; live.data = null; } }
+  catch(e){ live.error = e.message; if (e.status === 401){ sesionPerdida(); return; } }
   live.loading = false; render();
+}
+function sesionPerdida(){
+  live.authed = false; live.user = null; live.data = null; live.loading = false; live.busy = false; live.acceso = 'retirado';
+  history.replaceState(null, '', location.pathname + '#acceso'); render(); showPortal();
 }
 function demoAct(p){
   const d = DEMO;
+  if (p.op === 'usuario_set'){ const u = d.usuarios.find(x => x.email === p.email); if (u){ if (p.rol) u.rol = p.rol; if (p.estado){ if (p.estado === 'activo' && u.estado !== 'activo'){ u.aprobado_por = d.yo.email; u.aprobado_at = new Date().toISOString(); } u.estado = p.estado; } if (u.estado === 'activo' && u.rol === 'pendiente') u.rol = 'colaborador'; d.eventos.unshift({ agente:'DIRECCION', nivel: u.estado === 'bloqueado' ? 'warn' : 'info', texto:'Acceso de ' + (u.nombre || u.email) + ': ' + u.estado + ' · rol ' + u.rol + '.', created_at:new Date().toISOString() }); } }
   if (p.op === 'set_etapa'){ const o = d.oportunidades.find(x => x.id === p.id); if (o){ o.etapa = p.etapa; o.motivo_perdida = p.motivo || null; } }
   if (p.op === 'update_inmueble'){ const i = d.inmuebles.find(x => x.id === p.id); if (i){ if (p.anio_construccion) i.anio_construccion = Number(p.anio_construccion); if (p.tipo_estructura) i.tipo_estructura = p.tipo_estructura; if (p.iee_fecha) i.iee_fecha = p.iee_fecha; const y = new Date().getFullYear(); i.alerta_iee = !i.anio_construccion && !i.iee_fecha ? 'sin_datos' : !i.iee_fecha && i.anio_construccion <= y - 50 ? 'sin_iee' : i.iee_fecha && (Date.now() - Date.parse(i.iee_fecha)) > 9.5 * 365.25 * 864e5 ? 'renovar' : 'ok'; } }
   if (p.op === 'set_config') Object.assign(d.config, p.config);
@@ -552,19 +584,22 @@ function demoAct(p){
 }
 async function act(payload, okMsg){
   if (live.busy) return;
+  const soloDir = payload.op === 'set_config' || payload.op === 'usuario_set';
+  if (isLive() && (soloDir ? !esDireccion() : !puedeEditar())){ toast(soloDir ? 'Solo Dirección puede hacer este cambio.' : 'Tu rol (' + rolNom(rolActual()) + ') es de solo lectura: pide a Dirección un cambio de rol.'); return; }
   if (!isLive()){ const r = demoAct(payload); toast((typeof okMsg === 'function' ? okMsg(r) : okMsg) + ' · demostración'); live.editing = false; render(); return; }
   live.busy = true; render();
   try { const r = await api('/api/r4', { method:'POST', body: JSON.stringify(payload) }); toast(typeof okMsg === 'function' ? okMsg(r) : okMsg); live.editing = false; live.busy = false; await loadData(true); }
-  catch(e){ live.busy = false; toast('No se pudo completar: ' + e.message); render(); }
+  catch(e){ live.busy = false; if (e.status === 401){ toast('Tu acceso ha cambiado: vuelve a entrar.'); sesionPerdida(); return; } toast('No se pudo completar: ' + e.message); render(); }
 }
 
 function liveBanner(){
+  if (isLive() && !live.error && !puedeEditar()) return `<div class="callout">${pill(rolNom(rolActual()),'info')} Tu acceso es de <b>solo lectura</b>. Si necesitas editar, pide a Dirección un cambio de rol en «Equipo y accesos».</div>`;
   if (isLive()) return live.error ? `<div class="callout">${pill('Sin conexión','crit')} No se pudo actualizar: ${e2(live.error)}. Últimos datos de las ${fmtHora(live.at)}.</div>` : '';
   if (live.noBackend) return `<div class="callout"><b>Demostración interactiva.</b> Puedes tocar, mover oportunidades y editar: los cambios se quedan en esta vista. Los datos reales se ven en la plataforma desplegada.</div>`;
-  if (live.configured === false) return `<div class="callout"><b>Demostración.</b> Falta activar la conexión con los datos reales: variables <span class="code-inline">R4_PANEL_PASSWORD</span> y <span class="code-inline">R4_API_KEY</span> en Vercel.</div>`;
+  if (live.configured === false) return `<div class="callout"><b>Demostración.</b> Falta activar la conexión con los datos reales: variables <span class="code-inline">R4_API_KEY</span> y <span class="code-inline">GOOGLE_CLIENT_ID</span>/<span class="code-inline">GOOGLE_CLIENT_SECRET</span> (o <span class="code-inline">R4_PANEL_PASSWORD</span>) en Vercel.</div>`;
   if (live.authed && live.loading) return `<div class="callout">Cargando datos reales…</div>`;
   if (live.authed && live.error) return `<div class="callout">${pill('Sin conexión','crit')} ${e2(live.error)}. Revisa que el flujo «R4 · API» esté publicado en n8n.</div>`;
-  return `<div class="callout"><b>Demostración.</b> Pulsa <b>Conectar datos reales</b> para ver lo que leen ECO (Gmail) y ATLAS (WhatsApp).</div>`;
+  return `<div class="callout"><b>Demostración.</b> Pulsa <b>Entrar</b> y accede con tu cuenta de Google para ver lo que leen ECO (Gmail) y ATLAS (WhatsApp).</div>`;
 }
 
 /* ---- WhatsApp: mismo formato que el nodo «Componer WhatsApp» de n8n ---- */
@@ -744,7 +779,8 @@ function vistaAtlas(){
 function configLiveTop(){
   const c = cfg(), campos = String(c.wa_campos || '').split(',').map(s=>s.trim());
   const opts = ['nombre','empresa','email','telefono','servicio','urgencia','solicita','tipo_cliente','direccion_obra','municipio','titulo','resumen'];
-  return `${liveBanner()}${panel('WhatsApp y Gmail · ajustes de ECO', `<form id="cfg-form" class="form-grid">
+  const ro = isLive() && !esDireccion();
+  const html = `${liveBanner()}${panel('WhatsApp y Gmail · ajustes de ECO', `<form id="cfg-form" class="form-grid">
       <label for="cf-url">URL de Evolution API</label><input id="cf-url" name="evolution_url" value="${e2(c.evolution_url)}" placeholder="https://evolution.midominio.com" inputmode="url">
       <span class="hint">Sin barra final. La apikey va en la credencial «Evolution API R4» de n8n, nunca aquí.</span>
       <label for="cf-inst">Instancia</label><input id="cf-inst" name="evolution_instancia" value="${e2(c.evolution_instancia)}" placeholder="ATLASR4">
@@ -757,6 +793,7 @@ function configLiveTop(){
       <label for="cf-on">Avisos de ECO</label><select id="cf-on" name="eco_activo"><option value="true" ${c.eco_activo !== 'false' ? 'selected' : ''}>Activados</option><option value="false" ${c.eco_activo === 'false' ? 'selected' : ''}>Pausados</option></select>
       <span></span><div><button class="btn primary" type="submit" ${live.busy ? 'disabled' : ''}>Guardar ajustes</button></div>
     </form>`, `${srcTag(isLive())}<span class="agent">ECO</span>`)}`;
+  return ro ? html.replace(/<(input|select)(?=[\s>])/g, '<$1 disabled').replace('<button class="btn primary" type="submit"', '<span class="hint">Solo Dirección modifica estos ajustes.</span><button hidden class="btn primary" type="submit"') : html;
 }
 function integracionesPanel(){
   const d = D(), c = cfg(), ch = d.canales || {};
@@ -813,10 +850,66 @@ views['hoja-de-ruta'] = () => {
   </div>`;
 };
 
+/* ---- 12 Equipo y accesos · login con Google, Dirección aprueba y asigna rol ---- */
+const avatarU = (u, cls) => u.foto && /^https:\/\//.test(u.foto)
+  ? `<span class="avatar ${cls || ''} has-img"><img src="${e2(u.foto)}" alt="" referrerpolicy="no-referrer" loading="lazy" width="44" height="44"></span>`
+  : `<span class="avatar ${cls || ''}">${e2(iniciales(u.nombre || u.email))}</span>`;
+const ROLES_ASIGNABLES = ['tecnico','comercial','administracion','colaborador','direccion'];
+const btnConfirma = (a, email, txt, txtOk) => { const on = live.confirmEq === a + ':' + email; return `<button class="btn ${on ? 'danger' : ''}" type="button" data-eq="${a}" data-email="${e2(email)}" ${live.busy ? 'disabled' : ''} ${on ? 'aria-live="polite"' : ''}>${esc(on ? txtOk : txt)}</button>`; };
+const rolSelect = (u, attrs, sel) => `<select ${attrs} aria-label="Rol de ${e2(u.nombre || u.email)}">${ROLES_ASIGNABLES.map(r => `<option value="${r}" ${r === sel ? 'selected' : ''}>${esc(rolNom(r))}</option>`).join('')}</select>`;
+function vistaEquipo(){
+  const d = D(), us = Array.isArray(d.usuarios) ? d.usuarios : null, yo = yoEmail();
+  if (!us){
+    const u = live.user || {};
+    return `${liveBanner()}${panel('Tu acceso', `<div class="eq-yo">${avatarU({ nombre:u.nombre, email:u.email })}<div><b>${e2(u.nombre || u.email || '—')}</b><div class="muted small">${e2(u.email || '')}</div><div style="margin-top:8px">${pill(rolNom(rolActual()),'info')} ${pill('Activo','ok')}</div></div></div>
+      <p class="muted" style="margin:14px 0 0">Solo <b>Dirección</b> aprueba cuentas, asigna roles y retira accesos. Si necesitas otro rol, pídeselo a Dirección.</p>`, srcTag(isLive()))}`;
+  }
+  const pend = us.filter(u => u.estado === 'pendiente'), act = us.filter(u => u.estado === 'activo'), bloq = us.filter(u => u.estado === 'bloqueado');
+  const roles = new Set(act.map(u => u.rol));
+  const tarjetaPend = u => `<article class="eq-req">
+      ${avatarU(u)}
+      <div class="eq-who"><b>${e2(u.nombre || u.email)}</b><span class="muted small">${e2(u.email)}</span><span class="muted small">Solicitó acceso ${fmtFecha(u.created_at)}</span></div>
+      <div class="eq-acts">${rolSelect(u, `data-eq-pend="${e2(u.email)}"`, 'comercial')}
+        <button class="btn primary" type="button" data-eq="aprobar" data-email="${e2(u.email)}" ${live.busy ? 'disabled' : ''}>Aprobar</button>
+        ${btnConfirma('rechazar', u.email, 'Rechazar', '¿Rechazar? Toca otra vez')}</div>
+    </article>`;
+  const fila = u => { const yoMismo = u.email === yo; return `<tr class="${u.estado === 'bloqueado' ? 'eq-off' : ''}">
+      <td><div class="eq-persona">${avatarU(u)}<span><b>${e2(u.nombre || u.email)}</b>${yoMismo ? ' ' + pill('Tú','info') : ''}<span class="muted small" style="display:block">${e2(u.email)}</span></span></div></td>
+      <td>${yoMismo ? pill(rolNom(u.rol), 'acc') : rolSelect(u, `data-eq-rol="${e2(u.email)}" ${live.busy ? 'disabled' : ''}`, u.rol)}</td>
+      <td>${u.estado === 'activo' ? pill('Activo','ok') : pill('Bloqueado','crit')}</td>
+      <td class="small">${u.ultimo_acceso ? fmtFecha(u.ultimo_acceso) : '—'}<div class="muted small">${u.accesos || 0} accesos</div></td>
+      <td class="small muted">${u.aprobado_por ? e2(u.aprobado_por === 'sistema' ? 'R4_DIRECCION_EMAILS' : u.aprobado_por) : '—'}</td>
+      <td>${yoMismo ? '<span class="muted small">—</span>' : u.estado === 'activo'
+        ? btnConfirma('bloquear', u.email, 'Retirar acceso', '¿Retirar? Toca otra vez')
+        : `<button class="btn" type="button" data-eq="reactivar" data-email="${e2(u.email)}" ${live.busy ? 'disabled' : ''}>Reactivar</button>`}</td></tr>`; };
+  const SI = '<span class="eq-si" aria-label="Sí">●</span>', NO = '<span class="eq-no" aria-label="No">—</span>';
+  const matriz = [['direccion',1,1,1,1],['tecnico',1,1,0,0],['comercial',1,1,0,0],['administracion',1,0,0,0],['colaborador',1,0,0,0]];
+  return `${liveBanner()}
+  <div class="kpis">
+    <div class="kpi"><span class="l">Con acceso</span><span class="v">${act.length}</span><span class="d">${roles.size} roles en uso</span></div>
+    <div class="kpi"><span class="l">Pendientes de aprobar</span><span class="v">${pend.length}</span><span class="d">${pend.length ? 'Esperan tu decisión' : 'Sin solicitudes'}</span></div>
+    <div class="kpi"><span class="l">Accesos retirados</span><span class="v">${bloq.length}</span><span class="d">Bloqueo inmediato</span></div>
+    <div class="kpi"><span class="l">Acceso</span><span class="v" style="font-size:22px">Google</span><span class="d">Sin contraseñas que compartir</span></div>
+  </div>
+  <div class="grid g-3-1">
+    <div id="eq-pend">${panel('Solicitudes de acceso', pend.length ? `<div class="eq-reqs">${pend.map(tarjetaPend).join('')}</div>`
+      : `<p class="muted" style="margin:0">Sin solicitudes. Cuando alguien del equipo pulse <b>Entrar con Google</b> en el portal, aparecerá aquí para que elijas su rol y lo apruebes.</p>`, `${srcTag(isLive())}${pend.length ? pill(pend.length + ' pendiente' + (pend.length > 1 ? 's' : ''), 'warn') : ''}`)}</div>
+    ${panel('Cómo entra el equipo', `<ol class="eq-pasos">
+      <li>La persona abre la plataforma y pulsa <b>02 · Equipo → Entrar con Google</b>.</li>
+      <li>Su cuenta queda <b>pendiente</b>: no ve ningún dato. Aparece aquí y en la actividad de Mission Control.</li>
+      <li>Dirección elige su <b>rol</b> y pulsa <b>Aprobar</b>. En su siguiente entrada ya trabaja.</li>
+      <li><b>Retirar acceso</b> corta la sesión en su siguiente acción, sin esperar a que caduque.</li></ol>
+      <p class="muted small" style="margin:12px 0 0">Las cuentas de Dirección se fijan en Vercel (<span class="code-inline">R4_DIRECCION_EMAILS</span>) y siempre entran como Dirección: nadie puede quitarle el control.</p>`)}
+  </div>
+  ${panel('Equipo con cuenta', `<div class="tbl-wrap"><table class="eq-tbl"><thead><tr><th>Persona</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Aprobado por</th><th></th></tr></thead><tbody>${[...act, ...bloq].map(fila).join('')}</tbody></table></div>`, 'Cambiar el rol aplica en la siguiente acción', true)}
+  ${panel('Qué puede hacer cada rol', `<div class="tbl-wrap"><table><thead><tr><th>Rol</th><th>Ver datos</th><th>Editar CRM y Bandeja</th><th>Ajustes ECO y WhatsApp</th><th>Gestionar accesos</th></tr></thead><tbody>${matriz.map(([r, ...c]) => `<tr><td><b>${esc(rolNom(r))}</b><div class="muted small">${esc(ROLES[r][1])}</div></td>${c.map(x => `<td>${x ? SI : NO}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`, 'Se comprueba en Postgres en cada petición', true)}`;
+}
+
 views['mission-control'] = vistaMission;
 views['crm'] = vistaCRM;
 views['bandeja'] = vistaBandeja;
 views['atlas'] = vistaAtlas;
+views['equipo'] = vistaEquipo;
 
 /* ---------- Punto de información por sección (como en Ágora Hispana) ---------- */
 const INFO = {
@@ -831,12 +924,13 @@ const INFO = {
   'finanzas':'Fase 5 · PLUTO prepara el cierre mensual, los cobros por antigüedad y la tesorería a 13 semanas. Datos de ejemplo.',
   'atlas':'Equipo de agentes de R4. ATLAS orquesta y habla por WhatsApp; ECO lee Gmail. El resto se activa por fases.',
   'configuracion':'Ajustes de ECO y WhatsApp (sin claves: las claves viven en n8n), modo de facturación, datos de la empresa y roles.',
+  'equipo':'Quién entra en la plataforma y con qué rol. Cada persona accede con su cuenta de Google; queda pendiente hasta que Dirección la aprueba y le asigna un rol. Dirección puede cambiar el rol o retirar el acceso en cualquier momento.',
   'hoja-de-ruta':'Plan por fases de la Propuesta de desarrollo, estado real de cada fase y lo que falta de R4 para avanzar.'
 };
 
 /* ---------- navegación y cabecera ---------- */
 const nav = document.getElementById('nav');
-nav.innerHTML = sections.map(s=>`<a href="#${s.id}" data-id="${s.id}"><span class="code">${s.code}</span><span class="name">${s.name}</span><span class="sub">${s.sub}</span></a>`).join('');
+nav.innerHTML = sections.map(s=>`<a href="#${s.id}" data-id="${s.id}"><span class="code">${s.code}</span><span class="name">${s.name}${s.id === 'equipo' ? '<span class="nbadge" id="eq-badge" hidden></span>' : ''}</span><span class="sub">${s.sub}</span></a>`).join('');
 const currentSection = () => { const id = (location.hash || '').slice(1); return sections.find(s => s.id === id) || sections[0]; };
 
 function updateChrome(){
@@ -846,13 +940,17 @@ function updateChrome(){
   else if (LIVE_SECTIONS.has(sec.id)){ p.className = 'pill sample'; p.textContent = live.authed && live.loading ? 'Cargando…' : 'Demostración'; p.title = 'Conecta los datos reales para ver esta sección en vivo'; }
   else if (sec.id === 'hoja-de-ruta'){ p.className = 'pill info'; p.textContent = 'Propuesta · 23 nov 2026'; p.title = 'R4 · Propuesta de desarrollo de la plataforma'; }
   else { p.className = 'pill sample'; p.textContent = 'Ejemplo · fase siguiente'; p.title = 'Esta sección se conecta a datos reales en su fase'; }
-  const b = document.getElementById('auth-btn'); b.textContent = 'Conectar datos reales'; b.hidden = !!live.noBackend || live.authed;
+  const b = document.getElementById('auth-btn'); b.textContent = 'Entrar'; b.hidden = !!live.noBackend || live.authed;
+  const eqLink = nav.querySelector('[data-id="equipo"]'); if (eqLink) eqLink.hidden = live.authed && !esDireccion();
+  const nPend = esDireccion() ? (D().usuarios || []).filter(u => u.estado === 'pendiente').length : 0;
+  const bdg = document.getElementById('eq-badge'); if (bdg){ bdg.hidden = !nPend; bdg.textContent = nPend; bdg.title = nPend + ' solicitud(es) de acceso pendiente(s)'; }
   document.getElementById('plat-state').textContent = isLive() ? 'ATLAS y ECO conectados' : 'modo demostración';
   document.getElementById('plat-dot').className = 'dot' + (isLive() ? '' : ' off');
-  document.getElementById('who').textContent = live.authed ? 'Dirección' : 'Invitado';
+  const u = live.user || {};
+  document.getElementById('who').textContent = live.authed ? ((u.via === 'password' ? 'Dirección (emergencia)' : (u.nombre || u.email || '')) + ' · ' + rolNom(rolActual())) : 'Invitado';
   document.getElementById('foot').textContent = isLive()
-    ? 'Plataforma R4 v1.2 · Holocontrol. Mission Control, CRM, Bandeja, ATLAS y Configuración muestran datos reales (Gmail → ECO → Postgres). Presupuestos, Obras, Planning, Costes, Facturación y Finanzas siguen con datos de ejemplo hasta su fase.'
-    : 'Plataforma R4 v1.2 · Holocontrol en modo demostración: clientes, obras e importes son de ejemplo. Los datos reales entran por Gmail (ECO) y WhatsApp (ATLAS) al conectar la sesión.';
+    ? 'Plataforma R4 v1.4 · Holocontrol · acceso con Google. Mission Control, CRM, Bandeja, ATLAS y Configuración muestran datos reales (Gmail → ECO → Postgres). Presupuestos, Obras, Planning, Costes, Facturación y Finanzas siguen con datos de ejemplo hasta su fase.'
+    : 'Plataforma R4 v1.4 · Holocontrol en modo demostración: clientes, obras e importes son de ejemplo. Los datos reales entran por Gmail (ECO) y WhatsApp (ATLAS) al conectar la sesión.';
 }
 function render(){
   const sec = currentSection();
@@ -886,10 +984,22 @@ document.addEventListener('click', e => { if (infoEl && !infoEl.contains(e.targe
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInfo(); });
 document.getElementById('back-btn').addEventListener('click', () => { if (history.length > 1) history.back(); else location.hash = '#mission-control'; });
 
-/* ---------- Portal de acceso (como Ágora Hispana) ---------- */
+/* ---------- Portal de acceso (como Ágora Hispana) · login con Google ---------- */
 const portalEl = document.getElementById('portal');
+const G_ICO = '<svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+const ACCESO_MSG = {
+  pendiente:['Solicitud enviada a Dirección', 'Tu cuenta de Google ha quedado registrada y está pendiente de aprobación. Dirección la verá en «Equipo y accesos» y te asignará un rol; después vuelve a pulsar «Entrar con Google».', 'warn'],
+  bloqueado:['Acceso retirado', 'Dirección ha retirado el acceso de esta cuenta. Si crees que es un error, habla con Dirección.', 'crit'],
+  retirado:['Sesión cerrada', 'Dirección ha cambiado o retirado tu acceso. Vuelve a entrar con Google para continuar con tu rol actual.', 'warn'],
+  error:['No se pudo completar el acceso', 'Google no confirmó la cuenta o la petición caducó. Inténtalo de nuevo.', 'crit'],
+  cancelado:['Acceso cancelado', 'No se eligió ninguna cuenta de Google.', 'info'],
+  no_configurado:['Login con Google aún no activado', 'Faltan GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en Vercel. Dirección puede usar el acceso de emergencia.', 'warn']
+};
 function showPortal(){
   const sinServidor = live.noBackend || live.configured === false;
+  const g = live.google && !sinServidor, pw = live.password && !sinServidor;
+  const m = live.acceso && ACCESO_MSG[live.acceso];
+  const btnG = (id, txt) => `<button class="btn primary g-btn" type="button" id="${id}">${G_ICO}<span>${txt}</span></button>`;
   portalEl.innerHTML = `<div class="portal-in">
     <section class="panel portal-head"><div class="body">
       <img src="assets/r4-logo.svg" alt="R4 Rehabilitación de Estructuras" width="210" height="44">
@@ -897,16 +1007,23 @@ function showPortal(){
       <h2>Elige tu acceso</h2>
       <p>Un solo sistema para cada obra: del primer mensaje del cliente por Gmail o WhatsApp a la ficha, el presupuesto y la factura.</p>
     </div></section>
+    ${m ? `<div class="callout portal-msg ${m[2]}" role="alert" id="portal-msg"><b>${esc(m[0])}.</b> ${esc(m[1])}</div>` : ''}
     <div class="portal-cards">
       <section class="panel portal-card"><div class="body">
         <span class="num">01</span><h3>Dirección</h3>
-        <p>Panel central: Mission Control, CRM, Bandeja, agentes y hoja de ruta.</p>
-        <button class="btn primary" type="button" id="portal-dir">${sinServidor ? 'Ver demostración' : 'Entrar'}</button>
-        ${sinServidor ? '<span class="small muted">El acceso real se activa con la plataforma desplegada en Vercel.</span>' : ''}
+        <p>Control total: Mission Control, CRM, Bandeja, ajustes de ECO y WhatsApp, y aprobación de los accesos del equipo.</p>
+        ${sinServidor ? '<button class="btn primary" type="button" id="portal-dir">Ver demostración</button><span class="small muted">El acceso real se activa con la plataforma desplegada en Vercel.</span>'
+          : g ? btnG('portal-dir', 'Entrar con Google') : '<button class="btn primary" type="button" id="portal-pass">Entrar</button>'}
+        ${g && pw ? '<button class="linkish" type="button" id="portal-pass">Acceso de emergencia con contraseña</button>' : ''}
       </div></section>
       <section class="panel portal-card"><div class="body">
-        <span class="num">02</span><h3>Equipo y clientes</h3>
-        <p>Encargados y clientes hablan con ATLAS por WhatsApp, sin instalar nada. El portal del cliente llega en la fase 2.</p>
+        <span class="num">02</span><h3>Equipo</h3>
+        <p>Técnicos, comerciales, administración y colaboradores. Entra con tu cuenta de Google: Dirección aprueba tu acceso y decide tu rol.</p>
+        ${g ? btnG('portal-eq', 'Entrar con Google') : `<button class="btn" type="button" id="portal-eq-off">${sinServidor ? 'Disponible en la plataforma real' : 'Pendiente de activar'}</button>`}
+      </div></section>
+      <section class="panel portal-card"><div class="body">
+        <span class="num">03</span><h3>Clientes</h3>
+        <p>Hablan con ATLAS por WhatsApp, sin instalar nada. Su portal (presupuesto, firma, diario y facturas) llega en la fase 2.</p>
         <button class="btn" type="button" id="portal-cli">Próximamente</button>
       </div></section>
     </div>
@@ -914,22 +1031,26 @@ function showPortal(){
     <p class="portal-note">R4 Rehabilitación de Estructuras · Carrer Bellavista-C 14, 07600 Arenal (Mallorca) · Desarrollado por A.R.E.S. I.A.</p>
   </div>`;
   portalEl.hidden = false; document.body.style.overflow = 'hidden';
-  const f = document.getElementById('portal-dir'); if (f) f.focus();
+  const f = document.getElementById('portal-dir') || document.getElementById('portal-pass'); if (f) f.focus();
 }
-function hidePortal(){ portalEl.hidden = true; document.body.style.overflow = ''; if (!location.hash || location.hash === '#acceso') location.hash = '#mission-control'; render(); }
+function hidePortal(){ portalEl.hidden = true; document.body.style.overflow = ''; live.acceso = null; if (!location.hash || location.hash === '#acceso') location.hash = '#mission-control'; render(); }
 function openLogin(){ lerr.hidden = true; if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', ''); document.getElementById('login-pass').focus(); }
+const entrarGoogle = () => { location.href = '/api/auth/google'; };
 portalEl.addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.id === 'portal-dir'){ if (live.noBackend || live.configured === false) hidePortal(); else openLogin(); }
+  if (t.id === 'portal-dir'){ if (live.noBackend || live.configured === false) hidePortal(); else if (live.google) entrarGoogle(); else openLogin(); }
+  if (t.id === 'portal-eq') entrarGoogle();
+  if (t.id === 'portal-pass') openLogin();
+  if (t.id === 'portal-eq-off') toast(live.noBackend ? 'El equipo entra con Google en la plataforma desplegada.' : 'El login con Google se activa con GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en Vercel.');
   if (t.id === 'portal-demo') hidePortal();
   if (t.id === 'portal-cli') toast('El portal del cliente llega en la fase 2; hoy los clientes hablan con ATLAS por WhatsApp.');
 });
 
 /* ---------- acceso ---------- */
 const dlg = document.getElementById('login'), lerr = document.getElementById('login-err');
-document.getElementById('auth-btn').addEventListener('click', openLogin);
+document.getElementById('auth-btn').addEventListener('click', () => { history.replaceState(null, '', location.pathname + '#acceso'); showPortal(); });
 document.getElementById('exit-btn').addEventListener('click', async () => {
-  if (live.authed){ try { await api('/api/session', { method:'DELETE' }); } catch(e){} live.authed = false; live.data = null; toast('Sesión cerrada.'); }
+  if (live.authed){ try { await api('/api/session', { method:'DELETE' }); } catch(e){} live.authed = false; live.user = null; live.data = null; toast('Sesión cerrada.'); }
   closeInfo(); history.replaceState(null, '', location.pathname + '#acceso'); render(); showPortal();
 });
 document.getElementById('login-cancel').addEventListener('click', () => dlg.close());
@@ -939,9 +1060,9 @@ document.getElementById('login-form').addEventListener('submit', async e => {
   btn.disabled = true; lerr.hidden = true;
   try {
     await api('/api/session', { method:'POST', body: JSON.stringify({ password: pass.value }) });
-    pass.value = ''; dlg.close(); live.authed = true; if (!portalEl.hidden) hidePortal(); toast('Conectado. Cargando datos reales…'); await loadData();
+    pass.value = ''; dlg.close(); await checkSession(); if (!portalEl.hidden) hidePortal(); toast('Acceso de emergencia de Dirección. Cargando datos reales…'); await loadData();
   } catch(err){
-    lerr.textContent = err.status === 401 ? 'Contraseña incorrecta.' : err.status === 503 ? 'La plataforma aún no tiene configurado el acceso (variables de Vercel).' : 'No se pudo conectar: ' + err.message;
+    lerr.textContent = err.status === 401 ? 'Contraseña incorrecta.' : err.status === 503 ? (err.message || 'Acceso con contraseña no activado: entra con Google.') : 'No se pudo conectar: ' + err.message;
     lerr.hidden = false;
   }
   btn.disabled = false;
@@ -964,8 +1085,20 @@ function moverEtapa(id, etapa){
   act({ op:'set_etapa', id, etapa, motivo }, etapa === 'perdido' ? 'Oportunidad marcada como perdida.' : 'Oportunidad movida a «' + ETAPA_LARGA[etapa] + '».');
 }
 view.addEventListener('click', e => {
-  const t = e.target.closest('[data-msg],[data-iva],[data-period],[data-act],[data-live-msg],[data-lact],[data-inm-edit],[data-inm-cancel],[data-crm-tab],[data-cli],[data-step-opp],[data-open-msg],[data-open-cli]');
+  const t = e.target.closest('[data-msg],[data-iva],[data-period],[data-act],[data-live-msg],[data-lact],[data-inm-edit],[data-inm-cancel],[data-crm-tab],[data-cli],[data-step-opp],[data-open-msg],[data-open-cli],[data-eq]');
   if (!t) return;
+  if (t.dataset.eq){
+    const email = t.dataset.email, a = t.dataset.eq, u = (D().usuarios || []).find(x => x.email === email) || {}, quien = u.nombre || email;
+    if (a === 'aprobar'){ const sel = [...view.querySelectorAll('select[data-eq-pend]')].find(x => x.dataset.eqPend === email); const rol = sel ? sel.value : 'colaborador'; return act({ op:'usuario_set', email, rol, estado:'activo' }, quien + ' aprobado como ' + rolNom(rol) + '.'); }
+    if (a === 'rechazar' || a === 'bloquear'){
+      const k = a + ':' + email;   // confirmación de dos toques, sin diálogos que bloqueen la pantalla
+      if (live.confirmEq !== k){ live.confirmEq = k; clearTimeout(live.confirmT); live.confirmT = setTimeout(() => { live.confirmEq = null; render(); }, 5000); render(); return; }
+      live.confirmEq = null; clearTimeout(live.confirmT);
+      return act({ op:'usuario_set', email, estado:'bloqueado' }, a === 'rechazar' ? 'Solicitud de ' + quien + ' rechazada.' : 'Acceso de ' + quien + ' retirado.');
+    }
+    if (a === 'reactivar') return act({ op:'usuario_set', email, estado:'activo' }, 'Acceso de ' + quien + ' reactivado.');
+    return;
+  }
   if (t.dataset.crmTab){ live.crmTab = t.dataset.crmTab; render(); return; }
   if (t.dataset.cli !== undefined){ live.cliId = t.dataset.cli; render(); if (window.innerWidth < 1100){ const f = document.getElementById('ficha'); if (f) f.scrollIntoView({behavior:'smooth', block:'start'}); } return; }
   if (t.dataset.stepOpp){ moverEtapa(Number(t.dataset.stepOpp), t.dataset.step); return; }
@@ -994,6 +1127,7 @@ view.addEventListener('input', e => { if (e.target.id === 'crm-q'){ live.q = e.t
 view.addEventListener('change', e => {
   if (e.target.name === 'vfmode'){ state.vfMode = e.target.value; store.set('vfMode', state.vfMode); render(); toast('Modo de facturación: ' + VF[state.vfMode].label + '.'); const r0 = document.getElementById('vf-'+state.vfMode); if (r0) r0.focus(); return; }
   if (e.target.dataset.etapaFor) moverEtapa(Number(e.target.dataset.etapaFor), e.target.value);
+  if (e.target.dataset.eqRol){ const email = e.target.dataset.eqRol, u = (D().usuarios || []).find(x => x.email === email) || {}; act({ op:'usuario_set', email, rol: e.target.value }, 'Rol de ' + (u.nombre || email) + ': ' + rolNom(e.target.value) + '.'); }
 });
 view.addEventListener('submit', e => {
   e.preventDefault();
@@ -1043,9 +1177,10 @@ document.addEventListener('pointerdown', e => {
 }, { passive: true });
 
 /* ---------- arranque y refresco ---------- */
+(() => { const q = new URLSearchParams(location.search); const a = q.get('acceso'); if (a){ live.acceso = Object.prototype.hasOwnProperty.call(ACCESO_MSG, a) ? a : 'error'; history.replaceState(null, '', location.pathname + '#acceso'); } })();
 render();
 checkSession().then(() => {
-  if (live.authed){ if (location.hash === '#acceso') location.hash = '#mission-control'; loadData(); return; }
+  if (live.authed){ live.acceso = null; if (location.hash === '#acceso' || !location.hash) location.hash = '#mission-control'; loadData(); return; }
   render();
   if (!location.hash || location.hash === '#acceso') showPortal();
 });

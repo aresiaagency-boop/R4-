@@ -33,6 +33,12 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 - 2026-11-24 · Producción verificada: sesión de Dirección OK, «R4 · API», «R4 · ECO» y ATLASR4 publicados; webhook r4-api responde 403 sin clave; Configuración guardada (Evolution `https://r4-evolution-api.7dklrk.easypanel.host`, instancia `r4`, plataforma, Gmail). Pendiente: WhatsApp de Dirección, QR de la instancia r4 (estado Disconnected) y primer correo real por ECO.
 - 2026-11-24 · v1.3: Guía de implantación interactiva (guia.js/guia.css) con ON/OFF, foco sobre elementos, auto-comprobación y calculadora.
 
+- 2026-11-24 · v1.4 login con Google: tabla `usuarios`, `r4_auth_login`, `r4_api` con actor y permisos por rol; `/api/auth/google` + `/api/auth/callback`; sección «12 · Equipo y accesos»; Implantación pasa a 13. Tests 10/10, verificador 55/55 (Google simulado con MOCK_GOOGLE).
+- 2026-11-24 · Producción migrada: «R4 · Setup DB» renombrado «(esquema v1.4 · login Google)», ejecución 11 OK (8 tablas). La query guardada en n8n es el esquema SIN comentarios (distinta del JSON del repo): para migrar, reemplazar bloques (de `CREATE OR REPLACE FUNCTION r4_api(` a `$fn$;`), no aplicar diffs del repo.
+- 2026-11-24 · Compatibilidad: la migración aplicada en producción (ejecución 11) aún trata «sin actor» como Dirección para que el código v1.3 desplegado siga funcionando. La versión endurecida (sin actor → auth:false, summary filtrado por rol, tope de 50 solicitudes) está guardada en «R4 · Setup DB» y se ejecuta DESPUÉS de desplegar v1.4.
+- 2026-11-24 · Verifier (agente separado) revisó el login: sin fallos críticos; aplicados sus 6 arreglos (actor estricto, email Google = email BD, R4_SESSION_SECRET, GET solo summary, PKCE, filtrado por rol). Tests 12/12, eval acceso 27/27, verify 55/55.
+- 2026-11-24 · GCP: cliente OAuth web «R4 · Plataforma (login Google)» `312906714125-9njcgj43sjr7k6t4slbfupfualurbmid.apps.googleusercontent.com` (origen r4-eight-rosy.vercel.app, redirect /api/auth/callback). Vercel: `GOOGLE_CLIENT_ID` añadida (Production, tipo Config).
+
 ## Intentos fallidos
 
 - `gh` en la nube sin token válido → no se puede hacer push desde el contenedor; subir por la web de GitHub o desde el equipo de RHC.
@@ -45,10 +51,15 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 - Archivos ocultos (.gitignore, .claude/) no se suben al arrastrar carpetas en GitHub → crearlos con `/new/main?filename=…&value=…`.
 - Un intento anterior de esta sesión perdió el contexto a mitad del rediseño; el trabajo quedó en disco sin commit (holo.css, app.js). Lección: commit intermedio en cada hito.
 - `String.replace(a, b)` en JS con SQL que contiene `'$'` metió el resto de la query dentro de sí misma (patrón `$'`). Reparado; usar siempre función de reemplazo.
+- Playwright `page.route` NO intercepta destinos de redirección (accounts.google.com tras 302) → interceptar `/api/auth/google` con `route.fetch({maxRedirects:0})` y devolver 302 al callback.
+- `window.confirm` en la UI: Playwright lo descarta por defecto y bloquea la extensión de Chrome → confirmación de dos toques.
+- Tras reiniciar el contenedor, Postgres local pierde el rol `root` → `su postgres -c "psql -c 'CREATE ROLE root SUPERUSER LOGIN'"`.
+- Stub de `fetch` en tests: `'…/tokeninfo'.startsWith('…/token')` es true → comprobar la URL más larga primero.
 
-## Última sesión (2026-11-23, tarde)
+## Última sesión (2026-11-24 · login con Google)
 
-- Integrada la Propuesta de desarrollo (PDF del 23 nov). ECO probado en producción. Pendiente: repo en GitHub (lo sube RHC), variables de Vercel, credenciales «R4 API key» y «Evolution API R4», publicar «R4 · API» y «R4 · ECO».
+- Implantado el login OAuth con Google con Dirección al mando (aprobación, roles, retirada inmediata). BD de producción migrada. Cliente OAuth creado y `GOOGLE_CLIENT_ID` en Vercel.
+- Pendiente de RHC: `GOOGLE_CLIENT_SECRET` y `R4_DIRECCION_EMAILS` en Vercel, subir el código v1.4 a GitHub (despliega Vercel) y probar «Entrar con Google».
 
 ## Sesión anterior (2026-11-23)
 
@@ -56,10 +67,10 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 
 ## Próximos pasos
 
-1. Push del repo a `main` → primer despliegue en Vercel.
-2. Vercel: variables `R4_PANEL_PASSWORD` y `R4_API_KEY`.
-3. n8n: importar `R4_setup_db.json` y ejecutarlo; importar `R4_API.json` (credencial «R4 API key») y publicarlo; importar `R4_ECO_gmail.json`.
-4. GCP: cliente OAuth web con redirect `https://r4-n8n.7dklrk.easypanel.host/rest/oauth2-credential/callback`, añadir la cuenta Gmail nueva como usuario de prueba, credencial Gmail en n8n.
-5. Evolution: RHC configura instancia + número; webhook → `/webhook/atlasr4`; credencial «Evolution API R4»; rellenar Configuración en la plataforma.
-6. ATLASR4: copia «ATLASR4 · R4 v1» con el prompt nuevo y registro de mensajes en `mensajes` (canal whatsapp).
-7. Fase 2: Obras, Presupuestos (DÉDALO), Planning (KAIRÓS), Costes (HEFESTO), Facturación VERI*FACTU (EUNOMÍA), Finanzas (PLUTO).
+1. RHC: Vercel → `GOOGLE_CLIENT_SECRET` (secreto del cliente «R4 · Plataforma (login Google)»; si se cerró el diálogo, «Agregar secreto» en el cliente), `R4_DIRECCION_EMAILS`, `R4_SESSION_SECRET` (32+ aleatorios) y `R4_PUBLIC_URL=https://r4-eight-rosy.vercel.app`.
+2. RHC: subir v1.4 a GitHub (arrastrar el contenido del zip en Upload files) → Vercel despliega. Después: ejecutar «R4 · Setup DB» (versión endurecida).
+3. Verificar en producción: portal con «Entrar con Google», Dirección en vivo, solicitud de un segundo usuario, aprobar, retirar.
+4. GCP: publicar la app (Público → Publicar) para que entre el equipo sin ser usuario de prueba; decisión de RHC.
+5. Evolution: QR de la instancia r4 + webhook `/webhook/atlasr4` (MESSAGES_UPSERT). WhatsApp de Dirección en Configuración.
+6. Primer correo real a canaclaupalma@gmail.com para validar ECO en vivo.
+7. Fase 1: Facturación VERI*FACTU (EUNOMÍA).
