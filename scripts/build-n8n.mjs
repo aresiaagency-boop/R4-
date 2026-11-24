@@ -284,7 +284,8 @@ out('R4_documentos.json', {
     ['Preparar petición IA', '¿Archivo válido?'],
     ['¿Archivo válido?', 'Leer documento (OpenAI)', 0],
     ['¿Archivo válido?', 'Leer resultado', 1],
-    ['Leer documento (OpenAI)', 'Leer resultado']
+    ['Leer documento (OpenAI)', 'Leer resultado'],
+    ['Leer resultado', 'Responder']
   ]),
   settings: { ...settings, saveDataSuccessExecution: 'none' },
   pinData: {}

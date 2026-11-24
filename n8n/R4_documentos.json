@@ -186,6 +186,17 @@
           }
         ]
       ]
+    },
+    "Leer resultado": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

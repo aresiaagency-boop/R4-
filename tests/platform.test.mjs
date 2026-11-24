@@ -251,3 +251,18 @@ test('Gestión: fechas imposibles, enteros y duplicados', () => {
   assert.ok(buildPayload({ op: 'coste_del', id: 1e20 }).error);
   assert.equal(buildPayload({ op: 'parte_set', obra_id: 1, fecha: '2026-11-24', operarios: [{ id: 3 }, { id: 3 }] }).payload.operarios.length, 1);
 });
+
+test('n8n: con responseMode=responseNode, cada webhook llega a un «Respond to Webhook»', () => {
+  for (const f of ['R4_API', 'R4_documentos']) {
+    const wf = JSON.parse(readFileSync(new URL(`../n8n/${f}.json`, import.meta.url), 'utf8'));
+    for (const wh of wf.nodes.filter((n) => n.type === 'n8n-nodes-base.webhook' && n.parameters.responseMode === 'responseNode')) {
+      const vistos = new Set([wh.name]), cola = [wh.name]; let responde = false;
+      while (cola.length) {
+        const n = cola.shift(); const nodo = wf.nodes.find((x) => x.name === n);
+        if (nodo.type === 'n8n-nodes-base.respondToWebhook') responde = true;
+        for (const salida of ((wf.connections[n] || {}).main || [])) for (const l of salida) if (!vistos.has(l.node)) { vistos.add(l.node); cola.push(l.node); }
+      }
+      assert.ok(responde, `${f}: ${wh.name} no llega a ningún Respond to Webhook`);
+    }
+  }
+});

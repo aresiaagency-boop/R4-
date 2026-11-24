@@ -44,6 +44,9 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 - 2026-11-24 · v1.5 «Equipo y Clientes» construida: tests 15/15, test_flow SQL OK, eval de permisos 100/100, verificador Playwright 86/86 (Dirección, secretaría demo, técnico, cliente, móvil). Verifier independiente: 0 críticos; 5 importantes corregidos.
 - 2026-11-24 · n8n: flujo «R4 · Documentos IA» creado (`gUA6g2oMcFreH02c`, sin publicar). El repo de GitHub es público: `raw.githubusercontent.com/aresiaagency-boop/R4-/main/…` se puede leer desde la pestaña de n8n (útil para migrar con el schema del repo sin pegarlo).
 
+- 2026-11-24 · v1.5 EN PRODUCCIÓN: GitHub con el schema v1.5 (sha256 3dc1bb4c… igual al local), Vercel sirve v1.5 (portal con 3 puertas, /api/r4 y /api/doc → 401 sin sesión). BD migrada con «R4 · Setup DB (esquema v1.5 · Equipo y Clientes)» leyendo el schema de GitHub raw (ejecución 45, 19 tablas). Comprobación de solo lectura en producción: 11 tablas nuevas, 7 partidas (todas sin precio), 0 obras, permisos de encargado correctos, sin actor → auth:false, r4_laborables OK. Flujo temporal de comprobación archivado (`WG0rNfzqVR6XbPaS`).
+- 2026-11-24 · «R4 · Documentos IA» publicado por RHC, pero le faltaba la conexión «Leer resultado → Responder» (n8n respondía 500 «No Respond to Webhook node found»). Corregido en el borrador (PATCH) y en el repo; falta volver a pulsar Publish.
+
 ## Intentos fallidos
 
 - `gh` en la nube sin token válido → no se puede hacer push desde el contenedor; subir por la web de GitHub o desde el equipo de RHC.
@@ -64,6 +67,10 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 - Playwright: `page.route('**/api/auth/google')` no casa con `?tipo=…` → usar regex. `innerText` aplica `text-transform` (mayúsculas) → comparar con `textContent`. `page.goto` a otro `#hash` no recarga datos → `page.reload()`.
 - Los paneles con `clip-path` recortan lo que se sale: formularios `.form-grid` en columna de 1/3 deben apilarse (si no, «html intercepts pointer events»).
 - `const` usada dentro de una IIFE antes de declararse (TDZ) rompió `gestion.js` → llamar a `recalcDemo()` después de definir todo.
+- El mock local de n8n ocultó que el flujo de documentos no tenía conectado el «Respond to Webhook» → test que recorre el grafo de cada webhook con responseMode=responseNode.
+- n8n 2.x: editar un flujo publicado crea un borrador; producción sigue con la versión activa hasta volver a pulsar Publish (eso lo hace RHC).
+- Chrome puede servir el app.js antiguo desde caché al navegar → assets con `?v=` en index.html.
+- La extensión no tiene permiso en accounts.google.com: el login real con Google lo prueba RHC.
 
 ## Última sesión (2026-11-24 · v1.5 Equipo y Clientes)
 
@@ -77,9 +84,8 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 
 ## Próximos pasos
 
-1. RHC: subir `R4-plataforma-v1.5.zip` a GitHub (Upload files) y pulsar **Publish** en «R4 · Documentos IA».
-2. Migrar producción: en n8n, query de «R4 · Setup DB» = `db/schema.sql` de GitHub raw sin líneas de comentario → Execute → 19 tablas.
-3. Verificar producción: portal con 3 puertas, Mi jornada, obra real con parte, costes, almacén, portal de cliente.
+1. RHC: volver a pulsar **Publish** en «R4 · Documentos IA» (conexión del Responder corregida) y, cuando quiera, subir `R4-plataforma-v1.5.1.zip` (assets con versión y JSON del flujo corregido).
+2. RHC: entrar con Google como Dirección y dar de alta personal de obra, tarifas y la facturación anual de referencia; secretaría y encargados entran por 02 · Equipo.
 4. R4: precios y fórmula de las partidas estándar (mecanoviga, viga castellana, apuntalamiento) y el checklist de 15 variables de mecanoviga.
 5. R4: crear el correo exclusivo de facturas de materiales → flujo Gmail «R4 · Materiales» (como ECO) que llame al lector de documentos y asigne por código de obra.
 6. ATLAS: herramientas para presupuesto por WhatsApp (texto, audio, foto del checklist) y «salida de almacén» — cuando el QR de la instancia r4 esté vinculado.
