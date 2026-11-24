@@ -29,11 +29,12 @@ export default async function handler(req, res) {
   const url = new URL(req.url, base);
   const code = url.searchParams.get('code'), state = url.searchParams.get('state');
   if (url.searchParams.get('error')) return fin('cancelado');
-  const [esperado, verifier] = String(readState(req) || '').split('.');
+  const [esperado, verifier, tipo] = String(readState(req) || '').split('.');
   if (!code || !state || !esperado || !verifier || !safeEqual(state, esperado)) return fin('error');
   try {
     const g = await verificarGoogle(code, base + '/api/auth/callback', verifier);
-    const r = await n8n({ op: 'auth_login', email: g.email, nombre: g.nombre, foto: g.foto, direccion: direccionEmails().includes(g.email) });
+    const r = await n8n({ op: 'auth_login', email: g.email, nombre: g.nombre, foto: g.foto, direccion: direccionEmails().includes(g.email),
+      solicitud: ['direccion', 'equipo', 'cliente'].includes(tipo) ? tipo : 'equipo' });
     const u = r.data;
     if (!r.ok || !u || u.ok === false || String(u.email || '').toLowerCase() !== g.email) return fin('error');
     if (u.estado !== 'activo') return fin(u.estado === 'bloqueado' ? 'bloqueado' : 'pendiente');

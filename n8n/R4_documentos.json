@@ -1,0 +1,199 @@
+{
+  "name": "R4 · Documentos IA (facturas PDF/foto → costes)",
+  "nodes": [
+    {
+      "id": "ec69ccc0-478a-4f93-a24f-50cb79711b6d",
+      "name": "POST /webhook/r4-doc",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "r4-doc",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "webhookId": "7eaac52d-e5e6-4040-a3a8-984a1283ea0d",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kgItKJrwVQyHIxOP",
+          "name": "R4 API key"
+        }
+      },
+      "notes": "Misma credencial «R4 API key» que «R4 · API». Solo la llama Vercel (/api/doc)."
+    },
+    {
+      "id": "ebbef64e-a679-413c-a5aa-81fd21138244",
+      "name": "Preparar petición IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Petición a OpenAI con el documento (PDF como archivo, foto como imagen) · doc-v1.0\nconst b = $json.body || {};\nconst tipo = String(b.tipo || '');\nconst datos = String(b.datos || '');\nif (!datos || datos.length > 4500000 || !/^[A-Za-z0-9+/=]+$/.test(datos) || !['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(tipo)) {\n  return [{ json: { invalido: true } }];\n}\nconst contenido = tipo === 'application/pdf'\n  ? { type: 'file', file: { filename: String(b.nombre || 'documento.pdf').slice(0, 100), file_data: 'data:application/pdf;base64,' + datos } }\n  : { type: 'image_url', image_url: { url: 'data:' + tipo + ';base64,' + datos, detail: 'high' } };\nreturn [{ json: { body: {\n  model: 'gpt-4o-mini', temperature: 0,\n  response_format: { type: 'json_schema', json_schema: { name: 'documento_r4', strict: true, schema: {\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"proveedor\",\"fecha\",\"numero\",\"codigo_obra\",\"tipo_documento\",\"categoria\",\"tipo_coste\",\"base_imponible\",\"iva\",\"total\",\"lineas\"],\"properties\":{\"proveedor\":{\"type\":\"string\"},\"fecha\":{\"type\":\"string\"},\"numero\":{\"type\":\"string\"},\"codigo_obra\":{\"type\":\"string\"},\"tipo_documento\":{\"type\":\"string\",\"enum\":[\"factura\",\"albaran\",\"ticket\",\"nomina\",\"recibo\",\"otro\"]},\"categoria\":{\"type\":\"string\",\"enum\":[\"material\",\"gasolina\",\"alquiler\",\"subcontrata\",\"nomina_estructura\",\"seguro\",\"prevencion\",\"oficina\",\"vehiculo\",\"herramientas\",\"otros\"]},\"tipo_coste\":{\"type\":\"string\",\"enum\":[\"directo\",\"indirecto\"]},\"base_imponible\":{\"type\":\"number\"},\"iva\":{\"type\":\"number\"},\"total\":{\"type\":\"number\"},\"lineas\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"concepto\",\"importe\"],\"properties\":{\"concepto\":{\"type\":\"string\"},\"importe\":{\"type\":\"number\"}}}}}} } },\n  messages: [\n    { role: 'system', content: \"Eres el lector de documentos de R4 Rehabilitación de Estructuras (Mallorca, España).\\nRecibes facturas, albaranes y tickets de proveedores (materiales, gasolina, alquileres, subcontratas) y a veces nóminas o recibos de seguros.\\nExtrae SOLO lo que aparece en el documento; si un dato no aparece, usa cadena vacía o 0. No inventes.\\n- proveedor: razón social de quien EMITE el documento (nunca R4).\\n- fecha: fecha de emisión en formato AAAA-MM-DD.\\n- numero: número de factura, albarán o ticket.\\n- codigo_obra: código de obra de R4 si aparece (p. ej. «Obra 36», «Ref. obra: 36», «O-36», «Pedido obra 36» → «36»). Solo el código.\\n- base_imponible: importe sin IVA. iva: cuota de IVA. total: importe total con IVA.\\n- lineas: conceptos principales (máx. 12) con su importe sin IVA.\\n- categoria: material, gasolina, alquiler, subcontrata, nomina_estructura, seguro, prevencion, oficina, vehiculo, herramientas u otros.\\n- tipo_coste: «directo» si es material, gasolina, alquiler o subcontrata para una obra; «indirecto» si es estructura (oficina, seguros, prevención, nóminas de oficina, ordenadores).\" },\n    { role: 'user', content: [{ type: 'text', text: 'Extrae los datos de este documento.' }, contenido] }\n  ]\n} } }];"
+      }
+    },
+    {
+      "id": "5cd1fd0e-af0e-48bd-ab4d-5b6cf665233a",
+      "name": "¿Archivo válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "889ca74d-acf7-446b-aa0c-3ec8736f14a8",
+              "leftValue": "={{ !$json.invalido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8c1a18e1-b706-4ee9-a233-0226aa003725",
+      "name": "Leer documento (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        -80
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 55000
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ibzYsjSd50fbsD3I",
+          "name": "OpenAI account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d73d2d05-1123-42ae-aba2-31625ef92a28",
+      "name": "Leer resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const r = $json;\nif (r.invalido) return [{ json: { ok: false, error: 'archivo no válido (PDF, JPG, PNG o WEBP de hasta 3 MB)' } }];\ntry {\n  const doc = JSON.parse(r.choices[0].message.content);\n  return [{ json: { ok: true, version: 'doc-v1.0', documento: doc } }];\n} catch (e) {\n  return [{ json: { ok: false, error: 'la IA no pudo leer el documento', detalle: String((r.error && r.error.message) || e.message || '').slice(0, 200) } }];\n}"
+      }
+    },
+    {
+      "id": "3a907fd9-26ec-4e44-a598-2d539fe5cdaf",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "POST /webhook/r4-doc": {
+      "main": [
+        [
+          {
+            "node": "Preparar petición IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar petición IA": {
+      "main": [
+        [
+          {
+            "node": "¿Archivo válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Archivo válido?": {
+      "main": [
+        [
+          {
+            "node": "Leer documento (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Leer resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer documento (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Leer resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Madrid"
+  },
+  "pinData": {}
+}

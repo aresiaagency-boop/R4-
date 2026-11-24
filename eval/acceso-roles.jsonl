@@ -3,25 +3,98 @@
 {"caso": "direccion·usuario_set", "rol": "direccion", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "permitido"}
 {"caso": "direccion·set_etapa", "rol": "direccion", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "permitido"}
 {"caso": "direccion·reenviar_wa", "rol": "direccion", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "permitido"}
+{"caso": "direccion·operario_set", "rol": "direccion", "estado": "activo", "op": "operario_set", "extra": {"nombre": "Eval operario"}, "esperado": "permitido"}
+{"caso": "direccion·obra_set", "rol": "direccion", "estado": "activo", "op": "obra_set", "extra": {"codigo": "EVAL-1", "titulo": "Obra eval"}, "esperado": "permitido"}
+{"caso": "direccion·parte_set", "rol": "direccion", "estado": "activo", "op": "parte_set", "extra": {"obra_id": 999999, "fecha": "2026-11-02", "operarios": []}, "esperado": "permitido"}
+{"caso": "direccion·coste_add·directo", "rol": "direccion", "estado": "activo", "op": "coste_add", "extra": {"tipo": "directo", "categoria": "material", "obra_id": 999999, "concepto": "x", "importe": "1"}, "esperado": "permitido"}
+{"caso": "direccion·coste_add·indirecto", "rol": "direccion", "estado": "activo", "op": "coste_add", "extra": {"tipo": "indirecto", "categoria": "seguro", "concepto": "x", "importe": "1"}, "esperado": "permitido"}
+{"caso": "direccion·movimiento_add", "rol": "direccion", "estado": "activo", "op": "movimiento_add", "extra": {"articulo_id": 999999, "tipo": "entrada", "cantidad": "1"}, "esperado": "permitido"}
+{"caso": "direccion·presupuesto_set", "rol": "direccion", "estado": "activo", "op": "presupuesto_set", "extra": {"codigo": "EVAL-P", "titulo": "Presupuesto eval"}, "esperado": "permitido"}
+{"caso": "direccion·partida_set", "rol": "direccion", "estado": "activo", "op": "partida_set", "extra": {"codigo": "EV-01", "descripcion": "Partida eval"}, "esperado": "permitido"}
+{"caso": "direccion·cert_set", "rol": "direccion", "estado": "activo", "op": "cert_set", "extra": {"obra_id": 999999, "importe": "1"}, "esperado": "permitido"}
 {"caso": "tecnico·summary", "rol": "tecnico", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
 {"caso": "tecnico·set_config", "rol": "tecnico", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
 {"caso": "tecnico·usuario_set", "rol": "tecnico", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
 {"caso": "tecnico·set_etapa", "rol": "tecnico", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "permitido"}
 {"caso": "tecnico·reenviar_wa", "rol": "tecnico", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "permitido"}
+{"caso": "tecnico·operario_set", "rol": "tecnico", "estado": "activo", "op": "operario_set", "extra": {"nombre": "Eval operario"}, "esperado": "prohibido"}
+{"caso": "tecnico·obra_set", "rol": "tecnico", "estado": "activo", "op": "obra_set", "extra": {"codigo": "EVAL-1", "titulo": "Obra eval"}, "esperado": "permitido"}
+{"caso": "tecnico·parte_set", "rol": "tecnico", "estado": "activo", "op": "parte_set", "extra": {"obra_id": 999999, "fecha": "2026-11-02", "operarios": []}, "esperado": "permitido"}
+{"caso": "tecnico·coste_add·directo", "rol": "tecnico", "estado": "activo", "op": "coste_add", "extra": {"tipo": "directo", "categoria": "material", "obra_id": 999999, "concepto": "x", "importe": "1"}, "esperado": "permitido"}
+{"caso": "tecnico·coste_add·indirecto", "rol": "tecnico", "estado": "activo", "op": "coste_add", "extra": {"tipo": "indirecto", "categoria": "seguro", "concepto": "x", "importe": "1"}, "esperado": "prohibido"}
+{"caso": "tecnico·movimiento_add", "rol": "tecnico", "estado": "activo", "op": "movimiento_add", "extra": {"articulo_id": 999999, "tipo": "entrada", "cantidad": "1"}, "esperado": "permitido"}
+{"caso": "tecnico·presupuesto_set", "rol": "tecnico", "estado": "activo", "op": "presupuesto_set", "extra": {"codigo": "EVAL-P", "titulo": "Presupuesto eval"}, "esperado": "permitido"}
+{"caso": "tecnico·partida_set", "rol": "tecnico", "estado": "activo", "op": "partida_set", "extra": {"codigo": "EV-01", "descripcion": "Partida eval"}, "esperado": "permitido"}
+{"caso": "tecnico·cert_set", "rol": "tecnico", "estado": "activo", "op": "cert_set", "extra": {"obra_id": 999999, "importe": "1"}, "esperado": "permitido"}
 {"caso": "comercial·summary", "rol": "comercial", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
 {"caso": "comercial·set_config", "rol": "comercial", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
 {"caso": "comercial·usuario_set", "rol": "comercial", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
 {"caso": "comercial·set_etapa", "rol": "comercial", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "permitido"}
 {"caso": "comercial·reenviar_wa", "rol": "comercial", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "permitido"}
+{"caso": "comercial·operario_set", "rol": "comercial", "estado": "activo", "op": "operario_set", "extra": {"nombre": "Eval operario"}, "esperado": "prohibido"}
+{"caso": "comercial·obra_set", "rol": "comercial", "estado": "activo", "op": "obra_set", "extra": {"codigo": "EVAL-1", "titulo": "Obra eval"}, "esperado": "prohibido"}
+{"caso": "comercial·parte_set", "rol": "comercial", "estado": "activo", "op": "parte_set", "extra": {"obra_id": 999999, "fecha": "2026-11-02", "operarios": []}, "esperado": "prohibido"}
+{"caso": "comercial·coste_add·directo", "rol": "comercial", "estado": "activo", "op": "coste_add", "extra": {"tipo": "directo", "categoria": "material", "obra_id": 999999, "concepto": "x", "importe": "1"}, "esperado": "prohibido"}
+{"caso": "comercial·coste_add·indirecto", "rol": "comercial", "estado": "activo", "op": "coste_add", "extra": {"tipo": "indirecto", "categoria": "seguro", "concepto": "x", "importe": "1"}, "esperado": "prohibido"}
+{"caso": "comercial·movimiento_add", "rol": "comercial", "estado": "activo", "op": "movimiento_add", "extra": {"articulo_id": 999999, "tipo": "entrada", "cantidad": "1"}, "esperado": "prohibido"}
+{"caso": "comercial·presupuesto_set", "rol": "comercial", "estado": "activo", "op": "presupuesto_set", "extra": {"codigo": "EVAL-P", "titulo": "Presupuesto eval"}, "esperado": "permitido"}
+{"caso": "comercial·partida_set", "rol": "comercial", "estado": "activo", "op": "partida_set", "extra": {"codigo": "EV-01", "descripcion": "Partida eval"}, "esperado": "prohibido"}
+{"caso": "comercial·cert_set", "rol": "comercial", "estado": "activo", "op": "cert_set", "extra": {"obra_id": 999999, "importe": "1"}, "esperado": "prohibido"}
 {"caso": "administracion·summary", "rol": "administracion", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
 {"caso": "administracion·set_config", "rol": "administracion", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
 {"caso": "administracion·usuario_set", "rol": "administracion", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
-{"caso": "administracion·set_etapa", "rol": "administracion", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "prohibido"}
-{"caso": "administracion·reenviar_wa", "rol": "administracion", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "prohibido"}
+{"caso": "administracion·set_etapa", "rol": "administracion", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "permitido"}
+{"caso": "administracion·reenviar_wa", "rol": "administracion", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "permitido"}
+{"caso": "administracion·operario_set", "rol": "administracion", "estado": "activo", "op": "operario_set", "extra": {"nombre": "Eval operario"}, "esperado": "permitido"}
+{"caso": "administracion·obra_set", "rol": "administracion", "estado": "activo", "op": "obra_set", "extra": {"codigo": "EVAL-1", "titulo": "Obra eval"}, "esperado": "permitido"}
+{"caso": "administracion·parte_set", "rol": "administracion", "estado": "activo", "op": "parte_set", "extra": {"obra_id": 999999, "fecha": "2026-11-02", "operarios": []}, "esperado": "permitido"}
+{"caso": "administracion·coste_add·directo", "rol": "administracion", "estado": "activo", "op": "coste_add", "extra": {"tipo": "directo", "categoria": "material", "obra_id": 999999, "concepto": "x", "importe": "1"}, "esperado": "permitido"}
+{"caso": "administracion·coste_add·indirecto", "rol": "administracion", "estado": "activo", "op": "coste_add", "extra": {"tipo": "indirecto", "categoria": "seguro", "concepto": "x", "importe": "1"}, "esperado": "permitido"}
+{"caso": "administracion·movimiento_add", "rol": "administracion", "estado": "activo", "op": "movimiento_add", "extra": {"articulo_id": 999999, "tipo": "entrada", "cantidad": "1"}, "esperado": "permitido"}
+{"caso": "administracion·presupuesto_set", "rol": "administracion", "estado": "activo", "op": "presupuesto_set", "extra": {"codigo": "EVAL-P", "titulo": "Presupuesto eval"}, "esperado": "prohibido"}
+{"caso": "administracion·partida_set", "rol": "administracion", "estado": "activo", "op": "partida_set", "extra": {"codigo": "EV-01", "descripcion": "Partida eval"}, "esperado": "prohibido"}
+{"caso": "administracion·cert_set", "rol": "administracion", "estado": "activo", "op": "cert_set", "extra": {"obra_id": 999999, "importe": "1"}, "esperado": "permitido"}
+{"caso": "encargado·summary", "rol": "encargado", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
+{"caso": "encargado·set_config", "rol": "encargado", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
+{"caso": "encargado·usuario_set", "rol": "encargado", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
+{"caso": "encargado·set_etapa", "rol": "encargado", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "prohibido"}
+{"caso": "encargado·reenviar_wa", "rol": "encargado", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "prohibido"}
+{"caso": "encargado·operario_set", "rol": "encargado", "estado": "activo", "op": "operario_set", "extra": {"nombre": "Eval operario"}, "esperado": "prohibido"}
+{"caso": "encargado·obra_set", "rol": "encargado", "estado": "activo", "op": "obra_set", "extra": {"codigo": "EVAL-1", "titulo": "Obra eval"}, "esperado": "prohibido"}
+{"caso": "encargado·parte_set", "rol": "encargado", "estado": "activo", "op": "parte_set", "extra": {"obra_id": 999999, "fecha": "2026-11-02", "operarios": []}, "esperado": "permitido"}
+{"caso": "encargado·coste_add·directo", "rol": "encargado", "estado": "activo", "op": "coste_add", "extra": {"tipo": "directo", "categoria": "material", "obra_id": 999999, "concepto": "x", "importe": "1"}, "esperado": "permitido"}
+{"caso": "encargado·coste_add·indirecto", "rol": "encargado", "estado": "activo", "op": "coste_add", "extra": {"tipo": "indirecto", "categoria": "seguro", "concepto": "x", "importe": "1"}, "esperado": "prohibido"}
+{"caso": "encargado·movimiento_add", "rol": "encargado", "estado": "activo", "op": "movimiento_add", "extra": {"articulo_id": 999999, "tipo": "entrada", "cantidad": "1"}, "esperado": "permitido"}
+{"caso": "encargado·presupuesto_set", "rol": "encargado", "estado": "activo", "op": "presupuesto_set", "extra": {"codigo": "EVAL-P", "titulo": "Presupuesto eval"}, "esperado": "prohibido"}
+{"caso": "encargado·partida_set", "rol": "encargado", "estado": "activo", "op": "partida_set", "extra": {"codigo": "EV-01", "descripcion": "Partida eval"}, "esperado": "prohibido"}
+{"caso": "encargado·cert_set", "rol": "encargado", "estado": "activo", "op": "cert_set", "extra": {"obra_id": 999999, "importe": "1"}, "esperado": "prohibido"}
 {"caso": "colaborador·summary", "rol": "colaborador", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
 {"caso": "colaborador·set_config", "rol": "colaborador", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
 {"caso": "colaborador·usuario_set", "rol": "colaborador", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
 {"caso": "colaborador·set_etapa", "rol": "colaborador", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "prohibido"}
 {"caso": "colaborador·reenviar_wa", "rol": "colaborador", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "prohibido"}
+{"caso": "colaborador·operario_set", "rol": "colaborador", "estado": "activo", "op": "operario_set", "extra": {"nombre": "Eval operario"}, "esperado": "prohibido"}
+{"caso": "colaborador·obra_set", "rol": "colaborador", "estado": "activo", "op": "obra_set", "extra": {"codigo": "EVAL-1", "titulo": "Obra eval"}, "esperado": "prohibido"}
+{"caso": "colaborador·parte_set", "rol": "colaborador", "estado": "activo", "op": "parte_set", "extra": {"obra_id": 999999, "fecha": "2026-11-02", "operarios": []}, "esperado": "prohibido"}
+{"caso": "colaborador·coste_add·directo", "rol": "colaborador", "estado": "activo", "op": "coste_add", "extra": {"tipo": "directo", "categoria": "material", "obra_id": 999999, "concepto": "x", "importe": "1"}, "esperado": "prohibido"}
+{"caso": "colaborador·coste_add·indirecto", "rol": "colaborador", "estado": "activo", "op": "coste_add", "extra": {"tipo": "indirecto", "categoria": "seguro", "concepto": "x", "importe": "1"}, "esperado": "prohibido"}
+{"caso": "colaborador·movimiento_add", "rol": "colaborador", "estado": "activo", "op": "movimiento_add", "extra": {"articulo_id": 999999, "tipo": "entrada", "cantidad": "1"}, "esperado": "prohibido"}
+{"caso": "colaborador·presupuesto_set", "rol": "colaborador", "estado": "activo", "op": "presupuesto_set", "extra": {"codigo": "EVAL-P", "titulo": "Presupuesto eval"}, "esperado": "prohibido"}
+{"caso": "colaborador·partida_set", "rol": "colaborador", "estado": "activo", "op": "partida_set", "extra": {"codigo": "EV-01", "descripcion": "Partida eval"}, "esperado": "prohibido"}
+{"caso": "colaborador·cert_set", "rol": "colaborador", "estado": "activo", "op": "cert_set", "extra": {"obra_id": 999999, "importe": "1"}, "esperado": "prohibido"}
+{"caso": "cliente·summary", "rol": "cliente", "estado": "activo", "op": "summary", "extra": {}, "esperado": "permitido"}
+{"caso": "cliente·set_config", "rol": "cliente", "estado": "activo", "op": "set_config", "extra": {"config": {"eco_activo": "true"}}, "esperado": "prohibido"}
+{"caso": "cliente·usuario_set", "rol": "cliente", "estado": "activo", "op": "usuario_set", "extra": {"email": "otro@r4.test", "rol": "comercial"}, "esperado": "prohibido"}
+{"caso": "cliente·set_etapa", "rol": "cliente", "estado": "activo", "op": "set_etapa", "extra": {"id": 999999, "etapa": "visita"}, "esperado": "prohibido"}
+{"caso": "cliente·reenviar_wa", "rol": "cliente", "estado": "activo", "op": "reenviar_wa", "extra": {"id": 999999}, "esperado": "prohibido"}
+{"caso": "cliente·operario_set", "rol": "cliente", "estado": "activo", "op": "operario_set", "extra": {"nombre": "Eval operario"}, "esperado": "prohibido"}
+{"caso": "cliente·obra_set", "rol": "cliente", "estado": "activo", "op": "obra_set", "extra": {"codigo": "EVAL-1", "titulo": "Obra eval"}, "esperado": "prohibido"}
+{"caso": "cliente·parte_set", "rol": "cliente", "estado": "activo", "op": "parte_set", "extra": {"obra_id": 999999, "fecha": "2026-11-02", "operarios": []}, "esperado": "prohibido"}
+{"caso": "cliente·coste_add·directo", "rol": "cliente", "estado": "activo", "op": "coste_add", "extra": {"tipo": "directo", "categoria": "material", "obra_id": 999999, "concepto": "x", "importe": "1"}, "esperado": "prohibido"}
+{"caso": "cliente·coste_add·indirecto", "rol": "cliente", "estado": "activo", "op": "coste_add", "extra": {"tipo": "indirecto", "categoria": "seguro", "concepto": "x", "importe": "1"}, "esperado": "prohibido"}
+{"caso": "cliente·movimiento_add", "rol": "cliente", "estado": "activo", "op": "movimiento_add", "extra": {"articulo_id": 999999, "tipo": "entrada", "cantidad": "1"}, "esperado": "prohibido"}
+{"caso": "cliente·presupuesto_set", "rol": "cliente", "estado": "activo", "op": "presupuesto_set", "extra": {"codigo": "EVAL-P", "titulo": "Presupuesto eval"}, "esperado": "prohibido"}
+{"caso": "cliente·partida_set", "rol": "cliente", "estado": "activo", "op": "partida_set", "extra": {"codigo": "EV-01", "descripcion": "Partida eval"}, "esperado": "prohibido"}
+{"caso": "cliente·cert_set", "rol": "cliente", "estado": "activo", "op": "cert_set", "extra": {"obra_id": 999999, "importe": "1"}, "esperado": "prohibido"}
 {"caso": "pendiente·summary", "rol": "pendiente", "estado": "pendiente", "op": "summary", "extra": {}, "esperado": "sin_acceso"}
 {"caso": "bloqueado·summary", "rol": "tecnico", "estado": "bloqueado", "op": "summary", "extra": {}, "esperado": "sin_acceso"}

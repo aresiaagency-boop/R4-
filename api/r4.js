@@ -5,12 +5,15 @@
 // Cada petición lleva el actor de la sesión ({email, rol, via}); Postgres decide permisos con el rol VIGENTE
 // en la tabla usuarios (si Dirección retira o cambia un acceso, aplica en la siguiente petición).
 import { env, isConfigured, isAuthed, sameOrigin, send, readBody, clearCookie } from '../lib/auth.js';
+import { OPS_GESTION, payloadGestion } from '../lib/gestion.js';
 
 const OPS = new Set(['summary', 'set_config', 'update_extraccion', 'set_etapa', 'update_inmueble', 'reenviar_wa', 'marcar_cliente', 'marcar_ignorado', 'usuario_set']);
-export const ROLES = new Set(['direccion', 'tecnico', 'comercial', 'administracion', 'colaborador']);
+export const ROLES = new Set(['direccion', 'tecnico', 'comercial', 'administracion', 'encargado', 'colaborador', 'cliente']);
 const ESTADOS = new Set(['activo', 'bloqueado']);
 const ETAPAS = new Set(['nuevo', 'contactado', 'visita', 'presupuesto', 'aceptado', 'perdido']);
-const CONFIG_KEYS = new Set(['evolution_url', 'evolution_instancia', 'wa_destino_direccion', 'wa_campos', 'eco_activo', 'gmail_cuenta', 'plataforma_url']);
+const CONFIG_KEYS = new Set(['evolution_url', 'evolution_instancia', 'wa_destino_direccion', 'wa_campos', 'eco_activo', 'gmail_cuenta', 'plataforma_url',
+  'objetivo_beneficio', 'umbral_ci', 'coste_jornada_oficial', 'coste_jornada_peon', 'dias_nomina', 'correo_materiales', 'ventas_anuales_ref']);
+const CONFIG_NUM = new Set(['objetivo_beneficio', 'umbral_ci', 'coste_jornada_oficial', 'coste_jornada_peon', 'dias_nomina']);
 const EXTR_KEYS = new Set(['nombre', 'empresa', 'email', 'telefono', 'servicio', 'urgencia', 'solicita', 'tipo_cliente', 'direccion_obra', 'municipio', 'titulo', 'resumen']);
 
 const pick = (obj, keys, max = 1000) => Object.fromEntries(Object.entries(obj && typeof obj === 'object' ? obj : {})
@@ -19,6 +22,7 @@ const pick = (obj, keys, max = 1000) => Object.fromEntries(Object.entries(obj &&
 
 export function buildPayload(input) {
   const op = String((input && input.op) || 'summary');
+  if (OPS_GESTION.has(op)) return payloadGestion(op, input);
   if (!OPS.has(op)) return { error: 'operación no permitida' };
   const p = { op };
   if (['update_extraccion', 'set_etapa', 'update_inmueble', 'reenviar_wa', 'marcar_cliente', 'marcar_ignorado'].includes(op)) {
@@ -42,6 +46,9 @@ export function buildPayload(input) {
     p.config = pick(input.config, CONFIG_KEYS, 500);
     if (p.config.evolution_url && !/^https?:\/\/\S+$/.test(p.config.evolution_url)) return { error: 'URL de Evolution no válida' };
     if (p.config.plataforma_url && !/^https:\/\/\S+$/.test(p.config.plataforma_url)) return { error: 'URL de la plataforma no válida' };
+    for (const k of CONFIG_NUM) if (p.config[k] && !/^\d{1,6}([.,]\d{1,2})?$/.test(p.config[k])) return { error: k + ' debe ser un número' };
+    if (p.config.ventas_anuales_ref && !/^\d{1,3}(\.?\d{3}){0,3}([.,]\d{1,2})?$/.test(p.config.ventas_anuales_ref)) return { error: 'facturación de referencia no válida' };
+    if (p.config.correo_materiales && !/^[^@\s]{1,64}@[^@\s]{1,190}$/.test(p.config.correo_materiales)) return { error: 'correo de materiales no válido' };
   }
   if (op === 'usuario_set') {
     const email = String(input.email || '').trim().toLowerCase();
@@ -49,6 +56,9 @@ export function buildPayload(input) {
     p.email = email;
     if (input.rol !== undefined) { if (!ROLES.has(input.rol)) return { error: 'rol no válido' }; p.rol = input.rol; }
     if (input.estado !== undefined) { if (!ESTADOS.has(input.estado)) return { error: 'estado no válido' }; p.estado = input.estado; }
+    if (input.cliente_id !== undefined && input.cliente_id !== null && input.cliente_id !== '') {
+      const c = Number(input.cliente_id); if (!Number.isInteger(c) || c <= 0) return { error: 'cliente no válido' }; p.cliente_id = c;
+    }
     if (!p.rol && !p.estado) return { error: 'nada que cambiar' };
   }
   return { payload: p };

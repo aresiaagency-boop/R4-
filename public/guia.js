@@ -42,7 +42,7 @@ const STEPS = [
     auto: (s, ses) => !!(s && s.yo && s.yo.rol === 'direccion' && s.yo.via === 'google') },
   { id: 'f0-equipo', f: 'f0', t: 'Dar acceso al equipo (Dirección aprueba)', rol: 'Dirección', min: 5, sec: 'equipo', sel: '#eq-pend',
     que: 'Cada persona del equipo entra con Google y queda pendiente; Dirección elige su rol y la aprueba. Retirar un acceso es inmediato.',
-    pasos: ['Pide a cada persona que abra la plataforma y pulse <b>02 · Equipo → Entrar con Google</b>.', 'En <b>12 · Equipo y accesos</b>: elige el rol (Técnico, Comercial, Administración, Colaborador) y pulsa <b>Aprobar</b>.', 'Comprueba la tabla de permisos por rol.', 'Se marca solo con al menos una persona además de Dirección con acceso.'],
+    pasos: ['Pide a cada persona que abra la plataforma y pulse <b>02 · Equipo → Entrar con Google</b>.', 'En <b>14 · Equipo y clientes</b>: elige el rol (Técnico, Comercial, Administración, Colaborador) y pulsa <b>Aprobar</b>.', 'Comprueba la tabla de permisos por rol.', 'Se marca solo con al menos una persona además de Dirección con acceso.'],
     datos: 'Lista del equipo con su cuenta de Google y su rol.', auto: s => (s.usuarios || []).filter(u => u.estado === 'activo' && u.rol !== 'direccion').length >= 1 },
   { id: 'f0-flujos', f: 'f0', t: 'Flujos publicados en n8n', rol: 'A.R.E.S. I.A.', min: 10, sec: 'mission-control', sel: '.mc-net', link: ['Abrir n8n', LINKS.n8n],
     que: 'Tres flujos hacen funcionar el sistema: «R4 · API» (plataforma ↔ base de datos), «R4 · ECO» (lee Gmail) y «ATLASR4» (WhatsApp).',
@@ -87,14 +87,29 @@ const STEPS = [
     que: 'Sin estos datos no se puede emitir la primera factura con Verifactu.',
     pasos: ['Razón social, CIF y domicilio fiscal.', 'Forma jurídica (sociedad o autónomo): fija la fecha de Verifactu.', 'Modo de facturación: con o sin VERI*FACTU, o SII.', 'Certificado electrónico, series y último número de factura.'],
     datos: 'Documentación fiscal de R4.', auto: null },
-  { id: 'f2-equipo', f: 'f2', t: 'Equipo y teléfonos de encargados', rol: 'Dirección', min: 20, sec: 'configuracion', sel: '.panel',
-    que: 'Necesario para el plan de las 7:00 y los partes diarios por WhatsApp (fase 4 de la hoja de ruta).',
-    pasos: ['Lista de encargados, técnicos y administración con su rol y móvil.', 'Quién aprueba presupuestos y quién cierra el mes.'], auto: null },
+  { id: 'f2-personal', f: 'f2', t: 'Personal de obra y coste por jornada', rol: 'Secretaría', min: c => 10 + 3 * 8, sec: 'equipo', sel: '.panel', prep: () => clickSel('[data-eq-tab="personal"]'),
+    que: 'Cada operario (oficial, peón o encargado) con su nómina en coste empresa: el sistema calcula el coste por jornada y con los partes saca la mano de obra real de cada obra.',
+    pasos: ['14 · Equipo y clientes → <b>Personal de obra</b>.', 'Añade cada operario con su categoría.', 'Escribe la nómina mensual con Seguridad Social (coste empresa) y pulsa Guardar.', 'Se marca solo al haber 3 o más operarios.'],
+    datos: 'Nóminas del último mes (coste empresa).', auto: s => (s.operarios || []).length >= 3 },
+  { id: 'f2-indirectos', f: 'f2', t: 'Costes indirectos: seguros, prevención, nóminas de estructura', rol: 'Secretaría', min: 30, sec: 'costes', sel: '#excel-txt', prep: () => clickSel('[data-costes-tab="ingesta"]'),
+    que: 'Lo que no es mano de obra, material ni gasolina: nóminas de Dirección, técnico, encargado y secretaría, oficina, ordenadores, seguros (RC, convenio) y empresa de prevención. Los anuales se prorratean.',
+    pasos: ['07 · Costes → <b>Ingesta de datos</b>.', 'Copia las filas desde Excel (fecha, concepto, proveedor, importe, tipo, categoría, obra, periodicidad) y pégalas.', '<b>Previsualizar</b> → revisa → <b>Guardar</b>.', 'En Resumen aparecen el % de indirecto y el margen necesario para el 20 % de beneficio real.'],
+    datos: 'Excel de costes fijos de R4.', auto: s => (s.costes || []).some(c => c.tipo === 'indirecto') },
+  { id: 'f2-obras', f: 'f2', t: 'Abrir las obras en curso con código y cuadrilla', rol: 'Dirección', min: c => 10 * 5, sec: 'obras', sel: '[data-obra-nueva]',
+    que: 'Cada presupuesto aceptado se cuelga en Obras con su código, su PDF, la cuadrilla (oficiales y peones) y la fecha de inicio. La fecha de fin, el avance y el planning salen solos.',
+    pasos: ['05 · Obras → <b>+ Nueva obra</b> (o acepta el presupuesto en 04 · Presupuestos).', 'Código, trabajo, cliente, ubicación, inicio y cuadrilla.', 'Importe, jornadas de mano de obra y material del presupuesto.', 'Enlace al PDF del presupuesto (Drive).'],
+    auto: s => (s.obras || []).length > 0 },
+  { id: 'f2-precios', f: 'f2', t: 'Precios de las partidas estándar', rol: 'Técnico / Dirección', min: 30, sec: 'presupuestos', sel: '.panel',
+    que: 'Mecanoviga, viga castellana, apuntalamiento… con precio, % de material y jornadas por unidad. Con esto ATLAS podrá preparar presupuestos por WhatsApp.',
+    pasos: ['04 · Presupuestos → <b>Catálogo de partidas estándar</b>.', 'Precio por unidad, % de material y jornadas por unidad (fórmula de R4).', 'Guardar cada fila.'], datos: 'Fórmula y precios de R4.', auto: s => (s.partidas || []).length > 0 && (s.partidas || []).every(p => p.precio != null) },
   { id: 'f3-diaria', f: 'f3', t: 'Rutina diaria · 8:00 · Bandeja', rol: 'Dirección', min: c => Math.round(10 + c.correos * 0.3), sec: 'bandeja', sel: '[aria-label="Mensajes recibidos"]', cada: 'Cada día laborable',
     que: 'Los avisos llegan solos al WhatsApp. Por la mañana se revisa lo que ha entrado y se corrige lo dudoso.',
     pasos: ['Abre la Bandeja: los marcados «ECO procesando» se actualizan solos.', 'Corrige o marca «No es cliente» lo que no cuadre.', 'Las urgencias altas (🔴) se llaman antes de las 10:00.'], auto: null },
   { id: 'f3-etapas', f: 'f3', t: 'Tras cada llamada o visita: mover la oportunidad', rol: 'Técnico / comercial', min: 2, sec: 'crm', sel: '.kanban', prep: () => clickSel('[data-crm-tab="embudo"]'), cada: 'Tras cada contacto',
     que: 'El embudo solo es útil si refleja la realidad del día.', pasos: ['CRM → Embudo → arrastra la tarjeta.', 'En la ficha del cliente: WhatsApp, llamar o email con un toque.'], auto: null },
+  { id: 'f3-partes', f: 'f3', t: 'Cada tarde · parte de personal por obra', rol: 'Secretaría / encargado', min: c => 5, sec: 'mi-jornada', sel: '.tareas', cada: 'Cada día laborable',
+    que: 'Quién ha ido a cada obra y si fue jornada completa. Es lo que da el avance real y el coste de mano de obra.',
+    pasos: ['01 · Mi jornada → <b>Parte de personal</b> en cada obra en curso.', 'Marca los operarios (oficial o peón) y guarda.', 'Facturas de material: 07 · Costes → Leer con IA (PDF o foto) o en la ficha de la obra.', 'Material del almacén sin factura: 08 · Almacén → Salida a obra.'], auto: null },
   { id: 'f3-semanal', f: 'f3', t: 'Viernes · revisión de Mission Control', rol: 'Dirección', min: 15, sec: 'mission-control', sel: '.kpis', cada: 'Cada viernes',
     que: 'Diez minutos para ver la semana: mensajes, clientes nuevos, avisos fallidos y alertas IEE.',
     pasos: ['Revisa los 4 indicadores y el mapa de conexiones (todo en verde).', 'Si hay «errores de envío»: revisa Evolution (QR y apikey).', 'Envía a A.R.E.S. I.A. los correos mal clasificados para mejorar ECO.'], auto: null },
@@ -291,7 +306,7 @@ function onCalc(e){
 function enlaceNav(){
   const nav = document.getElementById('nav'); if (!nav || nav.querySelector('[data-guia]')) return;
   const a = document.createElement('a'); a.href = '#implantacion'; a.dataset.guia = '1';
-  a.innerHTML = '<span class="code">13</span><span class="name">Implantación</span><span class="sub">Guía paso a paso y cálculos</span>';
+  a.innerHTML = '<span class="code">15</span><span class="name">Implantación</span><span class="sub">Guía paso a paso y cálculos</span>';
   a.addEventListener('click', ev => { ev.preventDefault(); abrirPlan(); });
   nav.appendChild(a);
 }

@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { ecoRequestBody, ECO_VERSION } from '../n8n/eco-prompt.mjs';
+import { DOC_PROMPT, DOC_SCHEMA, DOC_VERSION } from '../n8n/doc-prompt.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = (f, wf) => { writeFileSync(join(root, 'n8n', f), JSON.stringify(wf, null, 2) + '\n'); console.log('✓ n8n/' + f, `(${wf.nodes.length} nodos)`); };
@@ -14,7 +15,8 @@ const uid = (s) => { const h = createHash('sha1').update('r4:' + s).digest('hex'
 // Credenciales que YA existen en r4-n8n (ids leídos de la instancia el 23 nov 2026)
 const CRED = {
   postgres: { postgres: { id: 'Zcr7iqVn6j1Z7UAb', name: 'Postgres account' } },
-  openai: { openAiApi: { id: 'ibzYsjSd50fbsD3I', name: 'OpenAI account' } }
+  openai: { openAiApi: { id: 'ibzYsjSd50fbsD3I', name: 'OpenAI account' } },
+  r4key: { httpHeaderAuth: { id: 'kgItKJrwVQyHIxOP', name: 'R4 API key' } }
 };
 
 const node = (name, type, typeVersion, position, parameters, extra = {}) => ({ id: uid(name), name, type, typeVersion, position, parameters, ...extra });
@@ -232,5 +234,58 @@ out('R4_API.json', {
     ['Marcar WA fallido', 'Responder (WA fallido)']
   ]),
   settings,
+  pinData: {}
+});
+
+// ---------------------------------------------------------------- 4) Documentos IA (facturas en PDF o foto → datos de coste)
+const DOC_PREPARAR = `// Petición a OpenAI con el documento (PDF como archivo, foto como imagen) · ${DOC_VERSION}
+const b = $json.body || {};
+const tipo = String(b.tipo || '');
+const datos = String(b.datos || '');
+if (!datos || datos.length > 4500000 || !/^[A-Za-z0-9+/=]+$/.test(datos) || !['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(tipo)) {
+  return [{ json: { invalido: true } }];
+}
+const contenido = tipo === 'application/pdf'
+  ? { type: 'file', file: { filename: String(b.nombre || 'documento.pdf').slice(0, 100), file_data: 'data:application/pdf;base64,' + datos } }
+  : { type: 'image_url', image_url: { url: 'data:' + tipo + ';base64,' + datos, detail: 'high' } };
+return [{ json: { body: {
+  model: 'gpt-4o-mini', temperature: 0,
+  response_format: { type: 'json_schema', json_schema: { name: 'documento_r4', strict: true, schema: ${JSON.stringify(DOC_SCHEMA)} } },
+  messages: [
+    { role: 'system', content: ${JSON.stringify(DOC_PROMPT)} },
+    { role: 'user', content: [{ type: 'text', text: 'Extrae los datos de este documento.' }, contenido] }
+  ]
+} } }];`;
+const DOC_LEER = `const r = $json;
+if (r.invalido) return [{ json: { ok: false, error: 'archivo no válido (PDF, JPG, PNG o WEBP de hasta 3 MB)' } }];
+try {
+  const doc = JSON.parse(r.choices[0].message.content);
+  return [{ json: { ok: true, version: '${DOC_VERSION}', documento: doc } }];
+} catch (e) {
+  return [{ json: { ok: false, error: 'la IA no pudo leer el documento', detalle: String((r.error && r.error.message) || e.message || '').slice(0, 200) } }];
+}`;
+out('R4_documentos.json', {
+  name: 'R4 · Documentos IA (facturas PDF/foto → costes)',
+  nodes: [
+    node('POST /webhook/r4-doc', 'n8n-nodes-base.webhook', 2, [0, 0], {
+      httpMethod: 'POST', path: 'r4-doc', authentication: 'headerAuth', responseMode: 'responseNode', options: { rawBody: false }
+    }, { webhookId: uid('webhook:r4-doc'), credentials: CRED.r4key, notes: 'Misma credencial «R4 API key» que «R4 · API». Solo la llama Vercel (/api/doc).' }),
+    node('Preparar petición IA', 'n8n-nodes-base.code', 2, [240, 0], { jsCode: DOC_PREPARAR }),
+    ifTrue('¿Archivo válido?', [460, 0], '!$json.invalido'),
+    node('Leer documento (OpenAI)', 'n8n-nodes-base.httpRequest', 4.2, [680, -80], {
+      method: 'POST', url: 'https://api.openai.com/v1/chat/completions', authentication: 'predefinedCredentialType', nodeCredentialType: 'openAiApi',
+      sendBody: true, specifyBody: 'json', jsonBody: '={{ JSON.stringify($json.body) }}', options: { timeout: 55000 }
+    }, { credentials: CRED.openai, onError: 'continueRegularOutput' }),
+    node('Leer resultado', 'n8n-nodes-base.code', 2, [900, 0], { jsCode: DOC_LEER }),
+    respond('Responder', [1120, 0], '$json')
+  ],
+  connections: link([
+    ['POST /webhook/r4-doc', 'Preparar petición IA'],
+    ['Preparar petición IA', '¿Archivo válido?'],
+    ['¿Archivo válido?', 'Leer documento (OpenAI)', 0],
+    ['¿Archivo válido?', 'Leer resultado', 1],
+    ['Leer documento (OpenAI)', 'Leer resultado']
+  ]),
+  settings: { ...settings, saveDataSuccessExecution: 'none' },
   pinData: {}
 });

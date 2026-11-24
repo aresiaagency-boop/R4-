@@ -32,7 +32,9 @@ Sin sesión, la plataforma funciona en **modo demostración** con datos de ejemp
    - (opcional) `R4_PANEL_PASSWORD` = acceso de emergencia de Dirección (mín. 8)
    - (opcional) `N8N_API_URL` = `https://r4-n8n.7dklrk.easypanel.host/webhook/r4-api`
 5. Redeploy. Entrar en la plataforma → **01 · Dirección → Entrar con Google**.
-6. Equipo: cada persona pulsa **02 · Equipo → Entrar con Google**; queda pendiente y Dirección la aprueba con su rol en **12 · Equipo y accesos**. «Retirar acceso» la saca en su siguiente acción.
+6. Equipo: cada persona pulsa **02 · Equipo → Entrar con Google**; queda pendiente y Dirección la aprueba con su rol en **14 · Equipo y clientes**. «Retirar acceso» la saca en su siguiente acción.
+7. Clientes: **03 · Clientes → Entrar con Google**; Dirección lo aprueba con rol *Cliente* y su ficha del CRM. Ve su obra, sus certificaciones y da su conformidad antes de facturar.
+8. Lector de facturas con IA: importar `n8n/R4_documentos.json` (o usar el flujo ya creado «R4 · Documentos IA»), credenciales «R4 API key» y «OpenAI account» → **Publish**.
 
 ### 3. Gmail (cuenta nueva de R4) → ECO
 1. GCP `r4-estructuras` → Google Auth Platform → **Clientes** → *Aplicación web*. URI de redirección: `https://r4-n8n.7dklrk.easypanel.host/rest/oauth2-credential/callback`.

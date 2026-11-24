@@ -9,8 +9,10 @@ let ok = 0;
 for (const c of casos) {
   const email = `eval.${c.rol}.${c.estado}@r4.test`;
   const sql = `BEGIN;
-INSERT INTO usuarios (email, nombre, rol, estado) VALUES ('${email}', 'Eval', '${c.rol}', '${c.estado}')
-  ON CONFLICT (email) DO UPDATE SET rol = EXCLUDED.rol, estado = EXCLUDED.estado;
+INSERT INTO clientes (nombre, email) VALUES ('Cliente eval', '${email}');
+INSERT INTO usuarios (email, nombre, rol, estado, cliente_id) VALUES ('${email}', 'Eval', '${c.rol}', '${c.estado}',
+  CASE WHEN '${c.rol}' = 'cliente' THEN (SELECT max(id) FROM clientes) END)
+  ON CONFLICT (email) DO UPDATE SET rol = EXCLUDED.rol, estado = EXCLUDED.estado, cliente_id = EXCLUDED.cliente_id;
 INSERT INTO usuarios (email, rol, estado) VALUES ('otro@r4.test', 'tecnico', 'activo') ON CONFLICT DO NOTHING;
 SELECT r4_api(${lit({ op: c.op, ...c.extra, actor: { email, rol: c.rol, via: 'google' } })});
 ROLLBACK;`;

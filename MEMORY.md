@@ -39,6 +39,11 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 - 2026-11-24 · Verifier (agente separado) revisó el login: sin fallos críticos; aplicados sus 6 arreglos (actor estricto, email Google = email BD, R4_SESSION_SECRET, GET solo summary, PKCE, filtrado por rol). Tests 12/12, eval acceso 27/27, verify 55/55.
 - 2026-11-24 · GCP: cliente OAuth web «R4 · Plataforma (login Google)» `312906714125-9njcgj43sjr7k6t4slbfupfualurbmid.apps.googleusercontent.com` (origen r4-eight-rosy.vercel.app, redirect /api/auth/callback). Vercel: `GOOGLE_CLIENT_ID` añadida (Production, tipo Config).
 
+- 2026-11-24 · v1.4 en producción (commit GitHub 1b29804 «Add files via upload»), login con Google activo (`google:true`), Setup DB endurecido ejecutado (ejecución 43).
+- 2026-11-24 · 5 notas de voz de la reunión con R4 transcritas en local (Whisper small CTranslate2 int8, ~3× tiempo real con 2 CPU) y organizadas en `docs/NOTAS_VOZ_2026-11-24.md`: obras con código y cuadrilla, partes de secretaría, mods/extensiones (manda el último mod), costes directos/indirectos (CI > 15 % = mal; beneficio real = margen directo − % CI; objetivo 20 %), correo exclusivo de facturas de material con código de obra, almacén, planning Gantt, certificación parcial/final con conformidad del cliente, presupuestos de mecanoviga por ATLAS (precios pendientes de R4).
+- 2026-11-24 · v1.5 «Equipo y Clientes» construida: tests 15/15, test_flow SQL OK, eval de permisos 100/100, verificador Playwright 86/86 (Dirección, secretaría demo, técnico, cliente, móvil). Verifier independiente: 0 críticos; 5 importantes corregidos.
+- 2026-11-24 · n8n: flujo «R4 · Documentos IA» creado (`gUA6g2oMcFreH02c`, sin publicar). El repo de GitHub es público: `raw.githubusercontent.com/aresiaagency-boop/R4-/main/…` se puede leer desde la pestaña de n8n (útil para migrar con el schema del repo sin pegarlo).
+
 ## Intentos fallidos
 
 - `gh` en la nube sin token válido → no se puede hacer push desde el contenedor; subir por la web de GitHub o desde el equipo de RHC.
@@ -55,11 +60,16 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 - `window.confirm` en la UI: Playwright lo descarta por defecto y bloquea la extensión de Chrome → confirmación de dos toques.
 - Tras reiniciar el contenedor, Postgres local pierde el rol `root` → `su postgres -c "psql -c 'CREATE ROLE root SUPERUSER LOGIN'"`.
 - Stub de `fetch` en tests: `'…/tokeninfo'.startsWith('…/token')` es true → comprobar la URL más larga primero.
+- HuggingFace bloqueado por el proxy: el modelo Whisper se sacó de npm (paquetes `@skillninja/shortmovie-telop-model-p0..p3`, verificado con su sha256). `faster_whisper.decode_audio` falla con esta versión de PyAV → decodificar con ffmpeg a PCM 16 kHz y pasar el array.
+- Playwright: `page.route('**/api/auth/google')` no casa con `?tipo=…` → usar regex. `innerText` aplica `text-transform` (mayúsculas) → comparar con `textContent`. `page.goto` a otro `#hash` no recarga datos → `page.reload()`.
+- Los paneles con `clip-path` recortan lo que se sale: formularios `.form-grid` en columna de 1/3 deben apilarse (si no, «html intercepts pointer events»).
+- `const` usada dentro de una IIFE antes de declararse (TDZ) rompió `gestion.js` → llamar a `recalcDemo()` después de definir todo.
 
-## Última sesión (2026-11-24 · login con Google)
+## Última sesión (2026-11-24 · v1.5 Equipo y Clientes)
 
-- Implantado el login OAuth con Google con Dirección al mando (aprobación, roles, retirada inmediata). BD de producción migrada. Cliente OAuth creado y `GOOGLE_CLIENT_ID` en Vercel.
-- Pendiente de RHC: `GOOGLE_CLIENT_SECRET` y `R4_DIRECCION_EMAILS` en Vercel, subir el código v1.4 a GitHub (despliega Vercel) y probar «Entrar con Google».
+- Notas de voz → requisitos → v1.5 completa en local y verificada. Producción: BD aún en v1.4 (se migra con el schema del repo en cuanto esté en GitHub) y flujo «R4 · Documentos IA» creado sin publicar.
+- Pendiente de RHC: subir v1.5 a GitHub y publicar «R4 · Documentos IA». Después: ejecutar «R4 · Setup DB» con el schema v1.5 (desde GitHub raw) y verificar producción.
+- Decisión abierta: si secretaría (administración) debe ver márgenes, nóminas e indirectos (hoy sí, porque los carga).
 
 ## Sesión anterior (2026-11-23)
 
@@ -67,10 +77,10 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 
 ## Próximos pasos
 
-1. RHC: Vercel → `GOOGLE_CLIENT_SECRET` (secreto del cliente «R4 · Plataforma (login Google)»; si se cerró el diálogo, «Agregar secreto» en el cliente), `R4_DIRECCION_EMAILS`, `R4_SESSION_SECRET` (32+ aleatorios) y `R4_PUBLIC_URL=https://r4-eight-rosy.vercel.app`.
-2. RHC: subir v1.4 a GitHub (arrastrar el contenido del zip en Upload files) → Vercel despliega. Después: ejecutar «R4 · Setup DB» (versión endurecida).
-3. Verificar en producción: portal con «Entrar con Google», Dirección en vivo, solicitud de un segundo usuario, aprobar, retirar.
-4. GCP: publicar la app (Público → Publicar) para que entre el equipo sin ser usuario de prueba; decisión de RHC.
-5. Evolution: QR de la instancia r4 + webhook `/webhook/atlasr4` (MESSAGES_UPSERT). WhatsApp de Dirección en Configuración.
-6. Primer correo real a canaclaupalma@gmail.com para validar ECO en vivo.
-7. Fase 1: Facturación VERI*FACTU (EUNOMÍA).
+1. RHC: subir `R4-plataforma-v1.5.zip` a GitHub (Upload files) y pulsar **Publish** en «R4 · Documentos IA».
+2. Migrar producción: en n8n, query de «R4 · Setup DB» = `db/schema.sql` de GitHub raw sin líneas de comentario → Execute → 19 tablas.
+3. Verificar producción: portal con 3 puertas, Mi jornada, obra real con parte, costes, almacén, portal de cliente.
+4. R4: precios y fórmula de las partidas estándar (mecanoviga, viga castellana, apuntalamiento) y el checklist de 15 variables de mecanoviga.
+5. R4: crear el correo exclusivo de facturas de materiales → flujo Gmail «R4 · Materiales» (como ECO) que llame al lector de documentos y asigne por código de obra.
+6. ATLAS: herramientas para presupuesto por WhatsApp (texto, audio, foto del checklist) y «salida de almacén» — cuando el QR de la instancia r4 esté vinculado.
+7. Encargados con obras asignadas (hoy pueden poner partes de cualquier obra, máx. 14 días atrás y queda registrado).

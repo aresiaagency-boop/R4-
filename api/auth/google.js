@@ -4,6 +4,9 @@ import { env, googleEnabled, newState, newVerifier, challengeDe, stateCookie, ba
 export default function handler(req, res) {
   if (!googleEnabled()) return send(res, 503, { error: 'login con Google no configurado (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET)' });
   const state = newState(), verifier = newVerifier();
+  // Por qué puerta del portal entra: 01 Dirección · 02 Equipo · 03 Clientes (Dirección lo ve al aprobar)
+  const t = new URL(req.url || '/', 'http://x').searchParams.get('tipo');
+  const tipo = ['direccion', 'equipo', 'cliente'].includes(t) ? t : 'equipo';
   const q = new URLSearchParams({
     client_id: env().googleId,
     redirect_uri: baseUrl(req) + '/api/auth/callback',
@@ -15,5 +18,5 @@ export default function handler(req, res) {
     code_challenge: challengeDe(verifier),
     code_challenge_method: 'S256'
   });
-  return redirect(res, 'https://accounts.google.com/o/oauth2/v2/auth?' + q.toString(), [stateCookie(state + '.' + verifier)]);
+  return redirect(res, 'https://accounts.google.com/o/oauth2/v2/auth?' + q.toString(), [stateCookie(state + '.' + verifier + '.' + tipo)]);
 }

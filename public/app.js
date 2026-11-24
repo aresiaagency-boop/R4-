@@ -18,20 +18,30 @@ const state = { vfMode: saved, msg: 0, iva: 'red', period: 'semana' };
 
 /* Secciones con la estructura de Ágora Hispana: código, nombre y descripción */
 const sections = [
-  {id:'mission-control', code:'00', name:'Mission Control', sub:'Estado de obras en tiempo real'},
-  {id:'crm', code:'01', name:'CRM', sub:'Clientes, inmuebles y oportunidades'},
-  {id:'bandeja', code:'02', name:'Bandeja', sub:'WhatsApp y Gmail'},
-  {id:'presupuestos', code:'03', name:'Presupuestos', sub:'Catálogo y mediciones'},
-  {id:'obras', code:'04', name:'Obras', sub:'Ficha y diario fotográfico'},
-  {id:'planning', code:'05', name:'Planning', sub:'Calendario y cuadrillas'},
-  {id:'costes', code:'06', name:'Costes', sub:'Por rangos de tiempo'},
-  {id:'facturacion', code:'07', name:'Facturación', sub:'Facturas y VERI*FACTU'},
-  {id:'finanzas', code:'08', name:'Finanzas', sub:'Control mensual'},
-  {id:'atlas', code:'09', name:'ATLAS', sub:'Orquestador inteligente'},
-  {id:'configuracion', code:'10', name:'Configuración', sub:'Empresa, roles y Verifactu'},
-  {id:'hoja-de-ruta', code:'11', name:'Hoja de ruta', sub:'Fases y datos pendientes de R4'},
-  {id:'equipo', code:'12', name:'Equipo y accesos', sub:'Google, roles y aprobaciones'}
+  {id:'mission-control', code:'00', name:'Mission Control', sub:'Estado de R4 en tiempo real'},
+  {id:'mi-jornada', code:'01', name:'Mi jornada', sub:'Tareas de hoy según tu rol'},
+  {id:'crm', code:'02', name:'CRM', sub:'Clientes, inmuebles y oportunidades'},
+  {id:'bandeja', code:'03', name:'Bandeja', sub:'WhatsApp y Gmail'},
+  {id:'presupuestos', code:'04', name:'Presupuestos', sub:'Partidas estándar y ajustes'},
+  {id:'obras', code:'05', name:'Obras', sub:'Cuadrilla, partes y certificaciones'},
+  {id:'planning', code:'06', name:'Planning', sub:'Cuadrillas por obra (Gantt)'},
+  {id:'costes', code:'07', name:'Costes', sub:'Directos, indirectos y beneficio real'},
+  {id:'almacen', code:'08', name:'Almacén', sub:'Entradas y salidas a obra'},
+  {id:'facturacion', code:'09', name:'Facturación', sub:'Certificaciones y VERI*FACTU'},
+  {id:'finanzas', code:'10', name:'Finanzas', sub:'Control mensual'},
+  {id:'atlas', code:'11', name:'ATLAS', sub:'Orquestador inteligente'},
+  {id:'configuracion', code:'12', name:'Configuración', sub:'Empresa, roles y Verifactu'},
+  {id:'hoja-de-ruta', code:'13', name:'Hoja de ruta', sub:'Fases y datos pendientes de R4'},
+  {id:'equipo', code:'14', name:'Equipo y clientes', sub:'Accesos, personal y portal de clientes'}
 ];
+/* Qué secciones ve cada rol (Dirección todas). El servidor filtra además los datos. */
+const NAV_ROL = {
+  administracion:['mission-control','mi-jornada','crm','bandeja','presupuestos','obras','planning','costes','almacen','facturacion','finanzas'],
+  tecnico:['mission-control','mi-jornada','crm','bandeja','presupuestos','obras','planning','almacen','atlas'],
+  comercial:['mission-control','mi-jornada','crm','bandeja','presupuestos','planning'],
+  encargado:['mi-jornada','obras','planning','almacen'],
+  colaborador:['mi-jornada','obras','planning']
+};
 /* ---------- datos de ejemplo ---------- */
 const obras = [
   {id:'OB-26-031', cliente:'CP Edificio Miramar', lugar:"s'Arenal", trabajo:'Reparación de pilares y vigas con aluminosis', fase:'Refuerzo', avance:62, pres:48600, real:27400, prev:29100, fin:'19 dic'},
@@ -450,8 +460,8 @@ views['configuracion'] = () => `
    Sesión: /api/session  ·  Datos y acciones: /api/r4  (Vercel → n8n «R4 · API» → Postgres)
    Sin sesión, las secciones vivas usan DEMO, con la misma forma que r4_summary().
    ===================================================================== */
-const LIVE_SECTIONS = new Set(['mission-control','crm','bandeja','atlas','configuracion','equipo']);
-const live = { configured:null, noBackend:false, authed:false, user:null, google:false, password:false, acceso:null, data:null, loading:false, error:null, at:null, msgId:null, editing:false, busy:false, editInm:null, crmTab:'contactos', cliId:null, q:'' };
+const LIVE_SECTIONS = new Set(['mission-control','mi-jornada','crm','bandeja','presupuestos','obras','planning','costes','almacen','facturacion','atlas','configuracion','equipo']);
+const live = { configured:null, noBackend:false, authed:false, user:null, google:false, password:false, acceso:null, demoRol:null, data:null, loading:false, error:null, at:null, msgId:null, editing:false, busy:false, editInm:null, crmTab:'contactos', cliId:null, q:'' };
 const ETAPAS = [['nuevo','Nuevo'],['contactado','Contactado'],['visita','Visita'],['presupuesto','Presupuesto'],['aceptado','Aceptado']];
 const ETAPA_LARGA = { nuevo:'Nuevo', contactado:'Contactado', visita:'Visita de diagnóstico', presupuesto:'Presupuesto enviado', aceptado:'Aceptado', perdido:'Perdido' };
 const CAMPOS = [['nombre','Nombre'],['empresa','Empresa'],['email','Email'],['telefono','Teléfono'],['servicio','Servicio'],['urgencia','Urgencia'],['solicita','Solicita'],['tipo_cliente','Tipo de cliente'],['direccion_obra','Dirección de la obra'],['municipio','Municipio'],['titulo','Asunto'],['resumen','Resumen']];
@@ -473,14 +483,19 @@ const ROLES = {
   direccion:['Dirección','Control total: datos, ajustes de ECO/WhatsApp y accesos del equipo'],
   tecnico:['Técnico / jefe de obra','CRM, embudo, inmuebles y Bandeja: consulta y edita'],
   comercial:['Comercial / atención','CRM y Bandeja: consulta y edita'],
-  administracion:['Administración','Consulta todo · solo lectura hasta la fase de facturación'],
-  colaborador:['Colaborador externo','Consulta · solo lectura'],
+  administracion:['Administración / secretaría','Datos de clientes, partes de personal, costes, almacén y certificaciones'],
+  encargado:['Encargado de obra','Partes de personal, material de obra y salidas de almacén'],
+  colaborador:['Colaborador externo','Consulta de obras y planning · solo lectura'],
+  cliente:['Cliente','Portal: su obra, avance, certificaciones y conformidad'],
   pendiente:['Pendiente','Sin acceso hasta que Dirección apruebe']
 };
 const rolNom = r => (ROLES[r] || [r || '—'])[0];
-const rolActual = () => !live.authed ? 'direccion' : ((live.data && live.data.yo && live.data.yo.rol) || (live.user && live.user.rol) || 'direccion');
+const rolActual = () => !live.authed ? (live.demoRol || 'direccion') : ((live.data && live.data.yo && live.data.yo.rol) || (live.user && live.user.rol) || 'direccion');
+const navVisible = id => { const r = rolActual(); return r === 'direccion' || (NAV_ROL[r] || []).includes(id); };
+const esCliente = () => rolActual() === 'cliente';
 const esDireccion = () => rolActual() === 'direccion';
-const puedeEditar = () => ['direccion','tecnico','comercial'].includes(rolActual());
+const puedeEditar = () => ['direccion','tecnico','comercial','administracion'].includes(rolActual());
+const CRM_OPS = new Set(['update_extraccion','set_etapa','update_inmueble','reenviar_wa','marcar_cliente','marcar_ignorado']);
 const yoEmail = () => (live.data && live.data.yo && live.data.yo.email) || (live.user && live.user.via === 'google' ? live.user.email : '') || (isLive() ? '' : DEMO.yo.email);
 
 /* ---------- DEMO: misma forma que r4_summary() ---------- */
@@ -571,8 +586,10 @@ function sesionPerdida(){
   live.authed = false; live.user = null; live.data = null; live.loading = false; live.busy = false; live.acceso = 'retirado';
   history.replaceState(null, '', location.pathname + '#acceso'); render(); showPortal();
 }
+const demoHooks = [];
 function demoAct(p){
   const d = DEMO;
+  for (const h of demoHooks){ const r = h(p, d); if (r !== undefined) return r; }
   if (p.op === 'usuario_set'){ const u = d.usuarios.find(x => x.email === p.email); if (u){ if (p.rol) u.rol = p.rol; if (p.estado){ if (p.estado === 'activo' && u.estado !== 'activo'){ u.aprobado_por = d.yo.email; u.aprobado_at = new Date().toISOString(); } u.estado = p.estado; } if (u.estado === 'activo' && u.rol === 'pendiente') u.rol = 'colaborador'; d.eventos.unshift({ agente:'DIRECCION', nivel: u.estado === 'bloqueado' ? 'warn' : 'info', texto:'Acceso de ' + (u.nombre || u.email) + ': ' + u.estado + ' · rol ' + u.rol + '.', created_at:new Date().toISOString() }); } }
   if (p.op === 'set_etapa'){ const o = d.oportunidades.find(x => x.id === p.id); if (o){ o.etapa = p.etapa; o.motivo_perdida = p.motivo || null; } }
   if (p.op === 'update_inmueble'){ const i = d.inmuebles.find(x => x.id === p.id); if (i){ if (p.anio_construccion) i.anio_construccion = Number(p.anio_construccion); if (p.tipo_estructura) i.tipo_estructura = p.tipo_estructura; if (p.iee_fecha) i.iee_fecha = p.iee_fecha; const y = new Date().getFullYear(); i.alerta_iee = !i.anio_construccion && !i.iee_fecha ? 'sin_datos' : !i.iee_fecha && i.anio_construccion <= y - 50 ? 'sin_iee' : i.iee_fecha && (Date.now() - Date.parse(i.iee_fecha)) > 9.5 * 365.25 * 864e5 ? 'renovar' : 'ok'; } }
@@ -585,7 +602,7 @@ function demoAct(p){
 async function act(payload, okMsg){
   if (live.busy) return;
   const soloDir = payload.op === 'set_config' || payload.op === 'usuario_set';
-  if (isLive() && (soloDir ? !esDireccion() : !puedeEditar())){ toast(soloDir ? 'Solo Dirección puede hacer este cambio.' : 'Tu rol (' + rolNom(rolActual()) + ') es de solo lectura: pide a Dirección un cambio de rol.'); return; }
+  if (isLive() && (soloDir ? !esDireccion() : (CRM_OPS.has(payload.op) && !puedeEditar()))){ toast(soloDir ? 'Solo Dirección puede hacer este cambio.' : 'Tu rol (' + rolNom(rolActual()) + ') es de solo lectura: pide a Dirección un cambio de rol.'); return; }
   if (!isLive()){ const r = demoAct(payload); toast((typeof okMsg === 'function' ? okMsg(r) : okMsg) + ' · demostración'); live.editing = false; render(); return; }
   live.busy = true; render();
   try { const r = await api('/api/r4', { method:'POST', body: JSON.stringify(payload) }); toast(typeof okMsg === 'function' ? okMsg(r) : okMsg); live.editing = false; live.busy = false; await loadData(true); }
@@ -854,7 +871,9 @@ views['hoja-de-ruta'] = () => {
 const avatarU = (u, cls) => u.foto && /^https:\/\//.test(u.foto)
   ? `<span class="avatar ${cls || ''} has-img"><img src="${e2(u.foto)}" alt="" referrerpolicy="no-referrer" loading="lazy" width="44" height="44"></span>`
   : `<span class="avatar ${cls || ''}">${e2(iniciales(u.nombre || u.email))}</span>`;
-const ROLES_ASIGNABLES = ['tecnico','comercial','administracion','colaborador','direccion'];
+const ROLES_ASIGNABLES = ['tecnico','comercial','administracion','encargado','colaborador','cliente','direccion'];
+const clienteSelect = (u, attrs) => { const cs = clientesDe(D()); const sel = u.cliente_id || u.cliente_sugerido || '';
+  return `<select ${attrs} aria-label="Ficha de cliente de ${e2(u.nombre || u.email)}"><option value="">Ficha del CRM…</option>${cs.map(c => `<option value="${e2(c.id)}" ${String(c.id) === String(sel) ? 'selected' : ''}>${e2(c.nombre || c.empresa)}${c.email ? ' · ' + e2(c.email) : ''}</option>`).join('')}</select>`; };
 const btnConfirma = (a, email, txt, txtOk) => { const on = live.confirmEq === a + ':' + email; return `<button class="btn ${on ? 'danger' : ''}" type="button" data-eq="${a}" data-email="${e2(email)}" ${live.busy ? 'disabled' : ''} ${on ? 'aria-live="polite"' : ''}>${esc(on ? txtOk : txt)}</button>`; };
 const rolSelect = (u, attrs, sel) => `<select ${attrs} aria-label="Rol de ${e2(u.nombre || u.email)}">${ROLES_ASIGNABLES.map(r => `<option value="${r}" ${r === sel ? 'selected' : ''}>${esc(rolNom(r))}</option>`).join('')}</select>`;
 function vistaEquipo(){
@@ -868,8 +887,9 @@ function vistaEquipo(){
   const roles = new Set(act.map(u => u.rol));
   const tarjetaPend = u => `<article class="eq-req">
       ${avatarU(u)}
-      <div class="eq-who"><b>${e2(u.nombre || u.email)}</b><span class="muted small">${e2(u.email)}</span><span class="muted small">Solicitó acceso ${fmtFecha(u.created_at)}</span></div>
-      <div class="eq-acts">${rolSelect(u, `data-eq-pend="${e2(u.email)}"`, 'comercial')}
+      <div class="eq-who"><b>${e2(u.nombre || u.email)}</b><span class="muted small">${e2(u.email)}</span><span class="muted small">Solicitó acceso ${u.solicitud === 'cliente' ? 'como <b>cliente</b> (03)' : 'como <b>equipo</b> (02)'} · ${fmtFecha(u.created_at)}</span></div>
+      <div class="eq-acts">${rolSelect(u, `data-eq-pend="${e2(u.email)}"`, u.solicitud === 'cliente' ? 'cliente' : 'comercial')}
+        ${clienteSelect(u, `data-eq-cli="${e2(u.email)}"`)}
         <button class="btn primary" type="button" data-eq="aprobar" data-email="${e2(u.email)}" ${live.busy ? 'disabled' : ''}>Aprobar</button>
         ${btnConfirma('rechazar', u.email, 'Rechazar', '¿Rechazar? Toca otra vez')}</div>
     </article>`;
@@ -931,7 +951,12 @@ const INFO = {
 /* ---------- navegación y cabecera ---------- */
 const nav = document.getElementById('nav');
 nav.innerHTML = sections.map(s=>`<a href="#${s.id}" data-id="${s.id}"><span class="code">${s.code}</span><span class="name">${s.name}${s.id === 'equipo' ? '<span class="nbadge" id="eq-badge" hidden></span>' : ''}</span><span class="sub">${s.sub}</span></a>`).join('');
-const currentSection = () => { const id = (location.hash || '').slice(1); return sections.find(s => s.id === id) || sections[0]; };
+const currentSection = () => {
+  const id = (location.hash || '').slice(1);
+  const s0 = sections.find(s => s.id === id);
+  if (s0 && navVisible(s0.id)) return s0;
+  return sections.find(s => s.id === (navVisible('mission-control') ? 'mission-control' : 'mi-jornada')) || sections[0];
+};
 
 function updateChrome(){
   const sec = currentSection();
@@ -941,28 +966,30 @@ function updateChrome(){
   else if (sec.id === 'hoja-de-ruta'){ p.className = 'pill info'; p.textContent = 'Propuesta · 23 nov 2026'; p.title = 'R4 · Propuesta de desarrollo de la plataforma'; }
   else { p.className = 'pill sample'; p.textContent = 'Ejemplo · fase siguiente'; p.title = 'Esta sección se conecta a datos reales en su fase'; }
   const b = document.getElementById('auth-btn'); b.textContent = 'Entrar'; b.hidden = !!live.noBackend || live.authed;
-  const eqLink = nav.querySelector('[data-id="equipo"]'); if (eqLink) eqLink.hidden = live.authed && !esDireccion();
+  nav.querySelectorAll('a[data-id]').forEach(a => { a.hidden = !navVisible(a.dataset.id); });
+  document.body.dataset.modo = esCliente() ? 'cliente' : '';
   const nPend = esDireccion() ? (D().usuarios || []).filter(u => u.estado === 'pendiente').length : 0;
   const bdg = document.getElementById('eq-badge'); if (bdg){ bdg.hidden = !nPend; bdg.textContent = nPend; bdg.title = nPend + ' solicitud(es) de acceso pendiente(s)'; }
   document.getElementById('plat-state').textContent = isLive() ? 'ATLAS y ECO conectados' : 'modo demostración';
   document.getElementById('plat-dot').className = 'dot' + (isLive() ? '' : ' off');
   const u = live.user || {};
-  document.getElementById('who').textContent = live.authed ? ((u.via === 'password' ? 'Dirección (emergencia)' : (u.nombre || u.email || '')) + ' · ' + rolNom(rolActual())) : 'Invitado';
+  document.getElementById('who').textContent = live.authed ? ((u.via === 'password' ? 'Dirección (emergencia)' : (u.nombre || u.email || '')) + ' · ' + rolNom(rolActual())) : (live.demoRol ? 'Demostración · ' + rolNom(live.demoRol) : 'Invitado');
   document.getElementById('foot').textContent = isLive()
-    ? 'Plataforma R4 v1.4 · Holocontrol · acceso con Google. Mission Control, CRM, Bandeja, ATLAS y Configuración muestran datos reales (Gmail → ECO → Postgres). Presupuestos, Obras, Planning, Costes, Facturación y Finanzas siguen con datos de ejemplo hasta su fase.'
-    : 'Plataforma R4 v1.4 · Holocontrol en modo demostración: clientes, obras e importes son de ejemplo. Los datos reales entran por Gmail (ECO) y WhatsApp (ATLAS) al conectar la sesión.';
+    ? 'Plataforma R4 v1.5 · Holocontrol · Equipo y Clientes. Datos reales de Postgres: CRM, Bandeja, Presupuestos, Obras, Planning, Costes, Almacén y certificaciones. Finanzas y el envío a la AEAT siguen de ejemplo hasta su fase.'
+    : 'Plataforma R4 v1.5 · Holocontrol en modo demostración: clientes, obras, personas e importes son de ejemplo. Los datos reales se ven al entrar con Google.';
 }
 function render(){
   const sec = currentSection();
   nav.querySelectorAll('a').forEach(a=>{ a.setAttribute('aria-current', a.dataset.id===sec.id ? 'page' : 'false'); });
-  document.getElementById('crumb-code').textContent = sec.code;
-  document.getElementById('crumb-name').textContent = sec.name;
-  document.getElementById('crumb-sub').textContent = sec.sub;
+  const cli = esCliente();
+  document.getElementById('crumb-code').textContent = cli ? '03' : sec.code;
+  document.getElementById('crumb-name').textContent = cli ? 'Portal del cliente' : sec.name;
+  document.getElementById('crumb-sub').textContent = cli ? 'Tu obra con R4' : sec.sub;
   const b = document.getElementById('vf-badge'), m = VF[state.vfMode]; b.textContent = m.label; b.className = 'pill ' + m.badge;
   updateChrome();
   const focused = document.activeElement && document.activeElement.id;
   const caret = focused === 'crm-q' ? document.activeElement.selectionStart : null;
-  document.getElementById('view').innerHTML = views[sec.id]();
+  document.getElementById('view').innerHTML = esCliente() && views['portal-cliente'] ? views['portal-cliente']() : views[sec.id]();
   if (focused){ const f = document.getElementById(focused); if (f && f !== document.body){ f.focus({preventScroll:true}); if (caret != null && f.setSelectionRange) f.setSelectionRange(caret, caret); } }
 }
 window.addEventListener('hashchange', ()=>{ if (location.hash === '#acceso'){ showPortal(); return; } closeInfo(); render(); document.getElementById('view').focus({preventScroll:true}); window.scrollTo({top:0}); });
@@ -1020,11 +1047,13 @@ function showPortal(){
         <span class="num">02</span><h3>Equipo</h3>
         <p>Técnicos, comerciales, administración y colaboradores. Entra con tu cuenta de Google: Dirección aprueba tu acceso y decide tu rol.</p>
         ${g ? btnG('portal-eq', 'Entrar con Google') : `<button class="btn" type="button" id="portal-eq-off">${sinServidor ? 'Disponible en la plataforma real' : 'Pendiente de activar'}</button>`}
+        <button class="linkish" type="button" id="portal-eq-demo">Ver demostración del equipo (secretaría)</button>
       </div></section>
       <section class="panel portal-card"><div class="body">
         <span class="num">03</span><h3>Clientes</h3>
-        <p>Hablan con ATLAS por WhatsApp, sin instalar nada. Su portal (presupuesto, firma, diario y facturas) llega en la fase 2.</p>
-        <button class="btn" type="button" id="portal-cli">Próximamente</button>
+        <p>Siguen su obra: avance, fechas previstas, certificaciones y su conformidad antes de facturar. También hablan con ATLAS por WhatsApp.</p>
+        ${g ? btnG('portal-cli', 'Entrar con Google') : `<button class="btn" type="button" id="portal-cli-off">${sinServidor ? 'Disponible en la plataforma real' : 'Pendiente de activar'}</button>`}
+        <button class="linkish" type="button" id="portal-cli-demo">Ver demostración del portal de cliente</button>
       </div></section>
     </div>
     <div class="portal-foot">${sinServidor ? '' : '<button type="button" id="portal-demo">Ver demostración sin conectar</button>'}</div>
@@ -1035,15 +1064,19 @@ function showPortal(){
 }
 function hidePortal(){ portalEl.hidden = true; document.body.style.overflow = ''; live.acceso = null; if (!location.hash || location.hash === '#acceso') location.hash = '#mission-control'; render(); }
 function openLogin(){ lerr.hidden = true; if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', ''); document.getElementById('login-pass').focus(); }
-const entrarGoogle = () => { location.href = '/api/auth/google'; };
+const entrarGoogle = (tipo) => { location.href = '/api/auth/google?tipo=' + (tipo || 'equipo'); };
+function verDemo(rol){ live.demoRol = rol || null; hidePortal(); location.hash = rol === 'cliente' ? '#mi-jornada' : rol ? '#mi-jornada' : '#mission-control'; render(); }
 portalEl.addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
-  if (t.id === 'portal-dir'){ if (live.noBackend || live.configured === false) hidePortal(); else if (live.google) entrarGoogle(); else openLogin(); }
-  if (t.id === 'portal-eq') entrarGoogle();
+  if (t.id === 'portal-dir'){ if (live.noBackend || live.configured === false) verDemo(null); else if (live.google) entrarGoogle('direccion'); else openLogin(); }
+  if (t.id === 'portal-eq') entrarGoogle('equipo');
+  if (t.id === 'portal-cli') entrarGoogle('cliente');
+  if (t.id === 'portal-eq-demo') verDemo('administracion');
+  if (t.id === 'portal-cli-demo') verDemo('cliente');
+  if (t.id === 'portal-cli-off') toast(live.noBackend ? 'Los clientes entran con Google en la plataforma desplegada.' : 'El login con Google se activa con GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en Vercel.');
   if (t.id === 'portal-pass') openLogin();
   if (t.id === 'portal-eq-off') toast(live.noBackend ? 'El equipo entra con Google en la plataforma desplegada.' : 'El login con Google se activa con GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en Vercel.');
-  if (t.id === 'portal-demo') hidePortal();
-  if (t.id === 'portal-cli') toast('El portal del cliente llega en la fase 2; hoy los clientes hablan con ATLAS por WhatsApp.');
+  if (t.id === 'portal-demo') verDemo(null);
 });
 
 /* ---------- acceso ---------- */
@@ -1051,6 +1084,7 @@ const dlg = document.getElementById('login'), lerr = document.getElementById('lo
 document.getElementById('auth-btn').addEventListener('click', () => { history.replaceState(null, '', location.pathname + '#acceso'); showPortal(); });
 document.getElementById('exit-btn').addEventListener('click', async () => {
   if (live.authed){ try { await api('/api/session', { method:'DELETE' }); } catch(e){} live.authed = false; live.user = null; live.data = null; toast('Sesión cerrada.'); }
+  live.demoRol = null;
   closeInfo(); history.replaceState(null, '', location.pathname + '#acceso'); render(); showPortal();
 });
 document.getElementById('login-cancel').addEventListener('click', () => dlg.close());
@@ -1089,7 +1123,12 @@ view.addEventListener('click', e => {
   if (!t) return;
   if (t.dataset.eq){
     const email = t.dataset.email, a = t.dataset.eq, u = (D().usuarios || []).find(x => x.email === email) || {}, quien = u.nombre || email;
-    if (a === 'aprobar'){ const sel = [...view.querySelectorAll('select[data-eq-pend]')].find(x => x.dataset.eqPend === email); const rol = sel ? sel.value : 'colaborador'; return act({ op:'usuario_set', email, rol, estado:'activo' }, quien + ' aprobado como ' + rolNom(rol) + '.'); }
+    if (a === 'aprobar'){
+      const sel = [...view.querySelectorAll('select[data-eq-pend]')].find(x => x.dataset.eqPend === email); const rol = sel ? sel.value : 'colaborador';
+      const cs = [...view.querySelectorAll('select[data-eq-cli]')].find(x => x.dataset.eqCli === email); const cliente_id = cs && cs.value ? Number(cs.value) : undefined;
+      if (rol === 'cliente' && !cliente_id){ toast('Elige la ficha del CRM que verá este cliente.'); return; }
+      return act(Object.assign({ op:'usuario_set', email, rol, estado:'activo' }, rol === 'cliente' ? { cliente_id } : {}), quien + ' aprobado como ' + rolNom(rol) + '.');
+    }
     if (a === 'rechazar' || a === 'bloquear'){
       const k = a + ':' + email;   // confirmación de dos toques, sin diálogos que bloqueen la pantalla
       if (live.confirmEq !== k){ live.confirmEq = k; clearTimeout(live.confirmT); live.confirmT = setTimeout(() => { live.confirmEq = null; render(); }, 5000); render(); return; }
@@ -1178,11 +1217,16 @@ document.addEventListener('pointerdown', e => {
 
 /* ---------- arranque y refresco ---------- */
 (() => { const q = new URLSearchParams(location.search); const a = q.get('acceso'); if (a){ live.acceso = Object.prototype.hasOwnProperty.call(ACCESO_MSG, a) ? a : 'error'; history.replaceState(null, '', location.pathname + '#acceso'); } })();
+window.R4 = { sections, views, INFO, live, DEMO, D, cfg, act, demoHooks, api, loadData, render, toast, panel, pill, prog, esc, e2, eur, eur2,
+  fmtFecha, fmtHora, iniciales, srcTag, liveBanner, isLive, rolActual, esDireccion, esCliente, rolNom, ROLES, clientesDe, TZ, ICO, avatarU, store };
+setTimeout(arranque, 0);
+function arranque(){
 render();
 checkSession().then(() => {
   if (live.authed){ live.acceso = null; if (location.hash === '#acceso' || !location.hash) location.hash = '#mission-control'; loadData(); return; }
   render();
   if (!location.hash || location.hash === '#acceso') showPortal();
 });
+}
 setInterval(() => { if (live.authed && !live.busy && !live.editing && !drag && document.visibilityState === 'visible' && document.activeElement.id !== 'crm-q') loadData(true); }, 60000);
 })();

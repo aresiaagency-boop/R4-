@@ -106,7 +106,7 @@ test('Google OAuth: redirección con state y callback que abre sesión solo si D
   process.env.GOOGLE_CLIENT_SECRET = 'secreto-prueba';
   process.env.R4_DIRECCION_EMAILS = 'jefe@r4.es';
   const r1 = fakeRes();
-  google({ headers: { host: 'r4.test', 'x-forwarded-proto': 'https' } }, r1);
+  google({ url: '/api/auth/google?tipo=cliente', headers: { host: 'r4.test', 'x-forwarded-proto': 'https' } }, r1);
   assert.equal(r1.statusCode, 302);
   const loc = new URL(r1.headers.location);
   assert.equal(loc.host, 'accounts.google.com');
@@ -115,7 +115,8 @@ test('Google OAuth: redirección con state y callback que abre sesión solo si D
   const state = loc.searchParams.get('state');
   assert.equal(loc.searchParams.get('code_challenge_method'), 'S256');
   const cookieState = String(r1.headers['set-cookie']).match(/r4_oauth_state=([^;]+)/)[1];
-  const [st0, verifier] = cookieState.split('.');
+  const [st0, verifier, tipoSol] = cookieState.split('.');
+  assert.equal(tipoSol, 'cliente', 'la puerta del portal viaja en el state');
   assert.equal(st0, state);
   assert.equal(auth.challengeDe(verifier), loc.searchParams.get('code_challenge'), 'PKCE S256');
 
@@ -140,6 +141,7 @@ test('Google OAuth: redirección con state y callback que abre sesión solo si D
   let ll = simula('nuevo@gmail.com', 'pendiente', 'pendiente'); let r = fakeRes(); await callback(req, r);
   assert.equal(r.headers.location, 'https://r4.test/?acceso=pendiente');
   assert.equal(ll.find((x) => typeof x === 'object').direccion, false);
+  assert.equal(ll.find((x) => typeof x === 'object').solicitud, 'cliente');
   assert.ok(!String(r.headers['set-cookie']).includes('r4_session=ey'));
 
   ll = simula('jefe@r4.es', 'activo', 'direccion'); r = fakeRes(); await callback(req, r);
@@ -178,7 +180,7 @@ test('API: GET solo permite summary', async () => {
 });
 
 test('n8n: flujos coherentes (conexiones y credenciales)', () => {
-  for (const f of ['R4_setup_db', 'R4_ECO_gmail', 'R4_API']) {
+  for (const f of ['R4_setup_db', 'R4_ECO_gmail', 'R4_API', 'R4_documentos']) {
     const wf = JSON.parse(readFileSync(new URL(`../n8n/${f}.json`, import.meta.url), 'utf8'));
     const names = new Set(wf.nodes.map((n) => n.name));
     assert.equal(names.size, wf.nodes.length, `${f}: nombres de nodo duplicados`);
@@ -193,4 +195,59 @@ test('n8n: flujos coherentes (conexiones y credenciales)', () => {
 test('schema.sql: sin parámetros posicionales (pg-promise en n8n)', () => {
   const s = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8');
   assert.equal(/\$\d/.test(s), false);
+});
+
+test('Gestión: validación de obras, partes, costes (lote Excel), almacén y presupuestos', async () => {
+  const { numES } = await import('../lib/gestion.js');
+  assert.deepEqual(['48.000', '48.000,50', '12,5', '1200'].map(numES), [48000, 48000.5, 12.5, 1200]);
+  assert.ok(buildPayload({ op: 'obra_set', titulo: 'Sin código' }).error, 'obra nueva sin código');
+  assert.ok(buildPayload({ op: 'obra_set', codigo: '36', titulo: 'x', presupuesto_url: 'javascript:alert(1)' }).error);
+  assert.ok(buildPayload({ op: 'obra_set', codigo: '36<script>', titulo: 'x' }).error);
+  const ob = buildPayload({ op: 'obra_set', codigo: '36', titulo: 'Mecanovigas', importe: '48.000', jornadas: 30, actor: { email: 'malo' }, otro: 1 }).payload;
+  assert.deepEqual(ob, { op: 'obra_set', codigo: '36', titulo: 'Mecanovigas', importe: '48000', jornadas: '30' });
+  assert.ok(buildPayload({ op: 'parte_set', obra_id: 1, fecha: '24/11/2026', operarios: [] }).error);
+  assert.ok(buildPayload({ op: 'parte_set', obra_id: 1, fecha: '2026-11-24', operarios: [{ id: 1, jornadas: '7' }] }).error);
+  const lote = buildPayload({ op: 'coste_add', costes: Array.from({ length: 3 }, (_, i) => ({ tipo: 'indirecto', categoria: 'seguro', concepto: 'Seguro ' + i, importe: '1.200', origen: 'excel' })) }).payload;
+  assert.equal(lote.costes.length, 3); assert.equal(lote.costes[0].importe, '1200');
+  assert.ok(buildPayload({ op: 'coste_add', costes: [{ tipo: 'directo', concepto: 'x', importe: 'abc' }] }).error);
+  assert.ok(buildPayload({ op: 'coste_add', costes: Array.from({ length: 301 }, () => ({ tipo: 'directo', concepto: 'x', importe: 1 })) }).error);
+  assert.ok(buildPayload({ op: 'movimiento_add', articulo_id: 1, tipo: 'salida', cantidad: 3 }).error, 'salida sin obra');
+  assert.ok(buildPayload({ op: 'cert_estado', id: 1, estado: 'pagada' }).error);
+  const pr = buildPayload({ op: 'presupuesto_set', codigo: '37', titulo: 'Mecanovigas', ajuste_pct: '20', lineas: [{ descripcion: 'Mecanoviga', cantidad: '9,6', precio: 100 }] }).payload;
+  assert.equal(pr.lineas[0].cantidad, '9.6');
+  assert.ok(buildPayload({ op: 'presupuesto_set', codigo: '37', titulo: 'x', ajuste_pct: '900' }).error);
+  assert.deepEqual(buildPayload({ op: 'usuario_set', email: 'c@r4.es', rol: 'cliente', estado: 'activo', cliente_id: 7 }).payload,
+    { op: 'usuario_set', email: 'c@r4.es', rol: 'cliente', estado: 'activo', cliente_id: 7 });
+});
+
+test('/api/doc: comprueba el rol vigente en la BD antes de leer y sanea la respuesta', async () => {
+  const doc = (await import('../api/doc.js')).default;
+  const cookie = 'r4_session=' + encodeURIComponent(auth.sign({ e: 'enc@r4.es', n: 'Enc', r: 'encargado', v: 'google', exp: ahora() + 60 }));
+  const llamadas = [];
+  globalThis.fetch = async (url, o) => {
+    const b = JSON.parse(o.body); llamadas.push(b.op || 'doc');
+    if (b.op === 'doc_permiso') return new Response(JSON.stringify({ ok: true, rol: 'encargado' }));
+    return new Response(JSON.stringify({ ok: true, documento: { proveedor: 'Prov <b>', fecha: '2026-02-30x', total: '12.5', tipo_coste: 'raro', lineas: [{ concepto: 'a', importe: 3 }] } }));
+  };
+  const res = fakeRes();
+  await doc({ method: 'POST', headers: { host: 'r4.test', cookie }, body: { nombre: 'f.pdf', tipo: 'application/pdf', datos: 'JVBERi0xLjQ=' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(llamadas, ['doc_permiso', 'doc']);
+  const d = res.json().documento;
+  assert.equal(d.fecha, ''); assert.equal(d.tipo_coste, 'directo'); assert.equal(d.total, 12.5);
+  globalThis.fetch = async (url, o) => new Response(JSON.stringify({ ok: false, auth: false, error: 'acceso pendiente o retirado por Dirección' }));
+  const r2 = fakeRes();
+  await doc({ method: 'POST', headers: { host: 'r4.test', cookie }, body: { nombre: 'f.pdf', tipo: 'application/pdf', datos: 'JVBERi0xLjQ=' } }, r2);
+  assert.equal(r2.statusCode, 401, 'bloqueado en la BD → fuera aunque la cookie diga encargado');
+  const r3 = fakeRes();
+  await doc({ method: 'POST', headers: { host: 'r4.test', cookie }, body: { nombre: 'x.exe', tipo: 'application/x-msdownload', datos: 'AAAA' } }, r3);
+  assert.equal(r3.statusCode, 400);
+});
+
+test('Gestión: fechas imposibles, enteros y duplicados', () => {
+  assert.ok(buildPayload({ op: 'parte_set', obra_id: 1, fecha: '2026-02-30', operarios: [] }).error);
+  assert.ok(buildPayload({ op: 'obra_set', id: 1, oficiales: '2.5' }).error);
+  assert.ok(buildPayload({ op: 'obra_version', obra_id: 1, linea: '1e10', importe: 1 }).error);
+  assert.ok(buildPayload({ op: 'coste_del', id: 1e20 }).error);
+  assert.equal(buildPayload({ op: 'parte_set', obra_id: 1, fecha: '2026-11-24', operarios: [{ id: 3 }, { id: 3 }] }).payload.operarios.length, 1);
 });

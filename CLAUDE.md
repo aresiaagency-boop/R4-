@@ -38,6 +38,16 @@ Portal «Entrar con Google» ─► /api/auth/google (state anti-CSRF) ─► Go
 - Variables Vercel: `R4_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `R4_DIRECCION_EMAILS`, `R4_SESSION_SECRET`, opcionales `R4_PANEL_PASSWORD`, `R4_PUBLIC_URL` (fijarla en producción), `N8N_API_URL`.
 - Cliente OAuth GCP «R4 · Plataforma (login Google)» con redirect `https://r4-eight-rosy.vercel.app/api/auth/callback`. Si la app de Google está en «Prueba», solo entran los usuarios de prueba.
 
+## Gestión operativa v1.5 · Equipo y Clientes (notas de voz del 24 nov → `docs/NOTAS_VOZ_2026-11-24.md`)
+
+- Tablas: `operarios` (nómina coste empresa → coste/jornada), `obras` (código, cuadrilla oficiales+peones, inicio, periodo de control, PDF), `obra_presupuestos` (línea 0 = original, n = extensión; versión = mod; **manda la versión más alta de cada línea**), `partes` (operario×día×obra), `costes` (directo/indirecto, periodicidad), `articulos` + `movimientos` (la salida a obra crea coste de material), `certificaciones` (borrador → enviada → conforme → facturada), `partidas` (catálogo; precio NULL = pendiente de R4), `presupuestos` + `presupuesto_lineas` (aceptar → crea la obra).
+- Cálculos en SQL: `r4_obras_json` (avance = jornadas de partes ÷ jornadas presupuestadas; fecha fin = `r4_laborables(inicio, jornadas ÷ cuadrilla)`; control pendiente; coste directo y margen solo si el rol tiene `costes`), `r4_kpis_costes` (indirecto mensual con fijos una vez por concepto; % sobre `ventas_anuales_ref` o lo certificado en 12 m; CI/CD), `r4_presupuesto_totales`.
+- Permisos: `r4_puede(rol, accion)` (matriz única; `r4_permisos` la manda al front). `r4_gestion(p, rol, actor)` resuelve las operaciones nuevas; `r4_gestion_summary(rol)` y el summary quitan CRM, tarifas, nóminas, indirectos y márgenes a quien no debe verlos. El cliente solo ve `r4_portal(cliente_id)` y solo puede `cert_conforme`.
+- Roles: `direccion` · `tecnico` · `comercial` · `administracion` (secretaría) · `encargado` (partes ≤ 14 días, material de obra, almacén) · `colaborador` · `cliente` (vinculado a su ficha del CRM).
+- Front: `public/gestion.js` (usa `window.R4` que expone `app.js`; arranque diferido con `setTimeout` para que registre vistas antes del primer render). Demo con las tres puertas del portal: Dirección, Equipo (secretaría) y Cliente.
+- `/api/doc` → n8n «R4 · Documentos IA» (`gUA6g2oMcFreH02c`, webhook `r4-doc`): PDF o foto → OpenAI con JSON estricto (`n8n/doc-prompt.mjs`) → revisión humana → `coste_add`. Comprueba el rol vigente con `doc_permiso` (60 lecturas/hora, queda en eventos).
+- Validación de entrada: `lib/gestion.js` (SPEC por operación, números en formato español, fechas reales, enteros). Errores de datos en SQL → `{ok:false, error:'datos no válidos…'}`.
+
 ## Stack
 
 | Capa | Tecnología | Dónde |
@@ -67,7 +77,8 @@ npm test                      # pruebas sin red: sesión, CSRF, lista blanca, co
 npm run build:n8n             # regenera n8n/R4_*.json desde db/schema.sql y n8n/eco-prompt.mjs
 npm run eval                  # OPENAI_API_KEY=… evalúa ECO con eval/eco-extraccion.jsonl (umbral 90 %)
 npm run dev                   # servidor local tipo Vercel (R4_API_KEY, N8N_API_URL y GOOGLE_* o R4_PANEL_PASSWORD; MOCK_GOOGLE=1 simula Google)
-PGDATABASE=r4test npm run eval:acceso   # matriz de permisos por rol (eval/acceso-roles.jsonl, 27 casos)
+PGDATABASE=r4test npm run eval:acceso   # matriz de permisos por rol y operación (eval/acceso-roles.jsonl, 100 casos)
+psql -d r4demo -f db/seed_gestion_demo.sql   # datos de gestión de ejemplo SOLO en local
 node scripts/mock-n8n.mjs     # doble local de «R4 · API» contra Postgres local (PGDATABASE)
 npm run verify                # VERIFIER: Playwright, capturas en screenshots/ + verify-report.json
 # login Google simulado: dev-server con MOCK_GOOGLE=1 + R4_MOCK_GOOGLE=1 VERIFY_DIRECCION=<email de R4_DIRECCION_EMAILS> npm run verify
@@ -91,7 +102,7 @@ psql -d r4test -f db/schema.sql && psql -d r4test -f db/test_flow.sql   # prueba
 - `GOOGLE_CLIENT_SECRET` SOLO en Vercel (lo escribe RHC). El `GOOGLE_CLIENT_ID` es público.
 - Nunca aceptar el actor (email/rol) desde el cuerpo de la petición: solo desde la cookie firmada.
 - No tocar el flujo original `ATLASR4` (id `Pu9Whh6Pm28EdzbB`) sin exportar antes una copia.
-- `db/seed_demo.sql` y `db/test_flow.sql` NUNCA contra la BD de producción.
+- `db/seed_demo.sql`, `db/seed_gestion_demo.sql` y `db/test_flow.sql` NUNCA contra la BD de producción.
 
 ## Reglas de revisión (antes de dar algo por hecho)
 

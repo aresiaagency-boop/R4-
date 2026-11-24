@@ -16,9 +16,14 @@ const sql = (fn, payload) => {
 };
 
 createServer(async (req, res) => {
-  if (req.method !== 'POST' || req.url !== '/webhook/r4-api') { res.statusCode = 404; return res.end('{"message":"not registered"}'); }
+  if (req.method !== 'POST' || !['/webhook/r4-api', '/webhook/r4-doc'].includes(req.url)) { res.statusCode = 404; return res.end('{"message":"not registered"}'); }
   if (req.headers['x-r4-key'] !== KEY) { res.statusCode = 403; return res.end('Authorization data is wrong!'); }
   const chunks = []; for await (const c of req) chunks.push(c);
+  if (req.url === '/webhook/r4-doc') {   // lector de documentos simulado (sin OpenAI)
+    const b = JSON.parse(Buffer.concat(chunks).toString() || '{}');
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify(b.datos ? { ok: true, documento: { proveedor: 'Morteros Técnicos Baleares', fecha: '2026-11-20', numero: 'FA-2611-0457', codigo_obra: '36', tipo_documento: 'factura', categoria: 'material', tipo_coste: 'directo', base_imponible: 642.5, iva: 134.93, total: 777.43, lineas: [{ concepto: 'Mortero de reparación (25 sacos)', importe: 512.5 }, { concepto: 'Puente de unión epoxi', importe: 130 }] } } : { ok: false, error: 'archivo no válido' }));
+  }
   try {
     const body = JSON.parse(Buffer.concat(chunks).toString() || '{}');
     let r = sql('r4_api', body);

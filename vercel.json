@@ -25,5 +25,10 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/doc.js": {
+      "maxDuration": 60
+    }
+  }
 }

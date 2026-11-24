@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT || 3000);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json' };
-const routes = { '/api/session': '../api/session.js', '/api/r4': '../api/r4.js', '/api/auth/google': '../api/auth/google.js', '/api/auth/callback': '../api/auth/callback.js' };
+const routes = { '/api/session': '../api/session.js', '/api/r4': '../api/r4.js', '/api/auth/google': '../api/auth/google.js', '/api/auth/callback': '../api/auth/callback.js', '/api/doc': '../api/doc.js' };
 
 // MOCK_GOOGLE=1 (solo local): simula los endpoints de token de Google. El navegador de pruebas intercepta
 // accounts.google.com y vuelve al callback con code=<email en base64url>.
