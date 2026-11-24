@@ -12,6 +12,8 @@ Especificación: [`docs/PROPUESTA.md`](docs/PROPUESTA.md).
 
 Sin sesión, la plataforma funciona en **modo demostración** con datos de ejemplo.
 
+**Guía de implantación (v1.3):** botón flotante **Guía ON/OFF** que acompaña paso a paso (20 pasos en 5 fases, de cero a piloto automático), ilumina en pantalla cada elemento que hay que tocar, comprueba sola los pasos con los datos reales y calcula fechas, horas de carga, coste de IA y ahorro (sección 12 · Implantación).
+
 **Interfaz Holocontrol (v1.2):** portal «Elige tu acceso» como Ágora Hispana, paneles de cristal con filo de plasma, CRM táctil en orden Apple (Contactos → ficha con acciones rápidas, Embudo arrastrable con el dedo, Inmuebles con alerta IEE), Mission Control simétrico con las conexiones en tiempo real, punto de información, Atrás y Salir en cada pantalla.
 
 ## Puesta en marcha (una vez)

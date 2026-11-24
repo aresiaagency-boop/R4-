@@ -26,6 +26,13 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 - 2026-11-24 · Interfaz v1.2 «Holocontrol» (estilo Ágora Hispana: tokens --fondo #020b18, --cian #4fd8ff, chaflán clip-path, conic plasma con @property --ang; orden Apple en CRM). `r4_summary` devuelve ahora `clientes` y `oportunidades.cliente_id`; aplicado en producción (Setup DB ejecución 5, 7 tablas).
 - 2026-11-24 · Verificación visual: 34/34 en escritorio + móvil, capturas iPad Pro 11 horizontal sin errores de consola.
 
+- 2026-11-24 · Producción: https://r4-eight-rosy.vercel.app (Vercel `r4`, commit subido por RHC + 6 archivos ocultos añadidos por la web de GitHub). Repo de GitHub idéntico al local.
+- 2026-11-24 · GCP usuarios de prueba: aresiaagency@gmail.com y canaclaupalma@gmail.com. La credencial n8n «Gmail account» (`ID8hZlTmRn2vSEbH`) está conectada a **canaclaupalma@gmail.com** (38 correos); asignada al disparador de ECO.
+- 2026-11-24 · Credenciales n8n creadas vacías para que RHC pegue el valor: «R4 API key» (`kgItKJrwVQyHIxOP`, Name x-r4-key) y «Evolution API R4» (`gXGpzwwNm2w021Tn`, Name apikey); ya asignadas al webhook de «R4 · API» y a los nodos Evolution de API y ECO. Flujo auxiliar «R4 · comprobar cuenta Gmail» (`IeqSOKDWheGwNHoN`).
+
+- 2026-11-24 · Producción verificada: sesión de Dirección OK, «R4 · API», «R4 · ECO» y ATLASR4 publicados; webhook r4-api responde 403 sin clave; Configuración guardada (Evolution `https://r4-evolution-api.7dklrk.easypanel.host`, instancia `r4`, plataforma, Gmail). Pendiente: WhatsApp de Dirección, QR de la instancia r4 (estado Disconnected) y primer correo real por ECO.
+- 2026-11-24 · v1.3: Guía de implantación interactiva (guia.js/guia.css) con ON/OFF, foco sobre elementos, auto-comprobación y calculadora.
+
 ## Intentos fallidos
 
 - `gh` en la nube sin token válido → no se puede hacer push desde el contenedor; subir por la web de GitHub o desde el equipo de RHC.
@@ -33,6 +40,9 @@ Memoria persistente del proyecto. Cada sesión termina actualizando este archivo
 - Escribir `.env.example` con redirección de shell lo bloquea un hook de seguridad → variables documentadas en README/CLAUDE.md.
 - Subir el repo a GitHub desde el agente: `file_upload` solo admite archivos compartidos por el usuario; pedir acceso a carpeta y publicar un paquete base64 como artifact fueron denegados por el clasificador → el usuario arrastra la carpeta en GitHub › Upload files.
 - Pulsar «Guardar» al añadir usuarios de prueba en GCP lo deniega el clasificador → lo pulsa el usuario.
+- Publicar (activar) flujos en n8n lo deniega el clasificador → lo pulsa RHC. Los secretos (variables de Vercel, valores de credenciales) siempre los escribe RHC.
+- El correo de prueba desde Gmail web (automatizado) no llegó a enviarse: pedir a RHC que envíe uno.
+- Archivos ocultos (.gitignore, .claude/) no se suben al arrastrar carpetas en GitHub → crearlos con `/new/main?filename=…&value=…`.
 - Un intento anterior de esta sesión perdió el contexto a mitad del rediseño; el trabajo quedó en disco sin commit (holo.css, app.js). Lección: commit intermedio en cada hito.
 - `String.replace(a, b)` en JS con SQL que contiene `'$'` metió el resto de la query dentro de sí misma (patrón `$'`). Reparado; usar siempre función de reemplazo.
 

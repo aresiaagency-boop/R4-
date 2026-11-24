@@ -79,6 +79,19 @@ if (PASS) {
   check('móvil sin scroll horizontal', overflow <= 1, `${overflow}px`);
 }
 
+// Guía de implantación: botón ON/OFF, panel y plan
+await page.setViewportSize({ width: 1440, height: 900 });
+await page.goto(`${URL0}/#mission-control`, { waitUntil: 'networkidle' });
+if (await page.$('.g-fab')) {
+  if ((await page.getAttribute('.g-fab', 'aria-pressed')) !== 'true') await page.click('.g-fab');
+  check('guía: se enciende y muestra el panel', !!(await page.waitForSelector('.g-dock', { timeout: 5000 }).catch(() => null)));
+  await page.click('[data-g="plan"]');
+  check('guía: plan completo con cálculos', !!(await page.waitForSelector('.g-plan .g-out', { timeout: 5000 }).catch(() => null)));
+  await page.screenshot({ path: `${OUT}/guia-plan.png` });
+  await page.click('[data-p="cerrar"]'); await page.click('.g-fab');
+  check('guía: se apaga', (await page.getAttribute('.g-fab', 'aria-pressed')) === 'false' && !(await page.$('.g-dock')));
+} else check('guía: botón presente', false);
+
 check('sin errores de consola', errors.length === 0, errors.slice(0, 3).join(' | '));
 await browser.close();
 writeFileSync(`${OUT}/verify-report.json`, JSON.stringify({ url: URL0, at: new Date().toISOString(), results }, null, 2));

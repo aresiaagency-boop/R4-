@@ -36,6 +36,7 @@ Navegador ──► Vercel (public/ + api/) ──► n8n «R4 · API» (/webhoo
 - Lenguaje visual de **Ágora Hispana**: noche azul `#020b18`, cristal tallado con esquinas cortadas (`clip-path`), filo de **plasma vivo** (`conic-gradient` con `@property --ang` animado al tocar), cian `#4fd8ff` + verde R4 `#00ff7f`, rejilla de 44 px.
 - Orden **tipo Apple**: barra de secciones → lista → ficha (Contactos), segmentos (Contactos · Embudo · Inmuebles), acciones rápidas redondas, objetivos táctiles ≥ 48 px, tilde de pulsación.
 - Portal **«Elige tu acceso»** (01 Dirección · 02 Equipo y clientes), punto de información (i) por sección, **Atrás** y **Salir** en cada pantalla.
+- `public/guia.js` + `guia.css` = Guía de implantación (independiente de app.js: DOM, `location.hash` y `/api/*`). Pasos en el array `STEPS` (con `auto(summary)` para comprobarse solos) y cálculos en `calculos()`. Estado en `localStorage['r4:guia']`.
 - `public/app.css` = estructura base; `public/holo.css` = piel Holocontrol (se carga después y no cambia el marcado). Respetar `prefers-reduced-motion`.
 
 ## Comandos clave
